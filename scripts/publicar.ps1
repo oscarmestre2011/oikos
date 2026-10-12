@@ -87,8 +87,8 @@ if ($codigo -ne 0) {
         Write-Host 'La direccion de la app sera exactamente:' -ForegroundColor White
         Write-Host "  $urlApp" -ForegroundColor Green
         Write-Host ''
-        Write-Host '(La direccion depende del nombre del repositorio, asi que no lo cambies: los datos' -ForegroundColor DarkGray)
-        Write-Host ' del movil quedan atados a ella.)' -ForegroundColor DarkGray
+        Write-Host 'La direccion depende del nombre del repositorio: no lo cambies, porque los datos' -ForegroundColor DarkGray
+        Write-Host 'del movil quedan atados a ella.' -ForegroundColor DarkGray
     } else {
         Write-Host ''
         Write-Host 'La subida ha fallado. Revisa el mensaje de arriba.' -ForegroundColor Red
