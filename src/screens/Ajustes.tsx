@@ -4,7 +4,7 @@ import { Tarjeta } from '../components/Tarjeta'
 import {
   borraCategoria,
   borraCuenta,
-  borrarTodo,
+  empezarDeCero,
   escribeAjuste,
   estadisticas,
   exportaCopia,
@@ -352,8 +352,7 @@ export function Ajustes({ nav, hoy, onError }: Props) {
               setConfirmarBorrado(true)
               return
             }
-            await borrarTodo(false)
-            await escribeAjuste('versionSemilla', '1')
+            await empezarDeCero()
             setConfirmarBorrado(false)
             setEstado('Todo borrado. La app queda vacía, lista para empezar de cero.')
           }}

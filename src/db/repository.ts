@@ -131,6 +131,30 @@ export async function reiniciarConSemilla(): Promise<void> {
   })
 }
 
+/**
+ * Borra todo y deja la app como recien instalada, pero SIN volver a meter el historico.
+ *
+ * La marca `versionSemilla` se vuelve a poner en la MISMA transaccion, no despues: si se
+ * hiciera en dos pasos, la app se quedaria un instante sin ella, enseñaria la pantalla de
+ * "Preparando tus cuentas" y el salto se notaria. La bienvenida SI vuelve a salir, y es lo
+ * correcto: la app se ha quedado como el primer dia.
+ */
+export async function empezarDeCero(): Promise<void> {
+  await db.transaction('rw', [db.movimientos, db.categorias, db.cuentas, db.deudas, db.fotos, db.presupuestos, db.ajustes, db.bitcoin], async () => {
+    await Promise.all([
+      db.movimientos.clear(),
+      db.categorias.clear(),
+      db.cuentas.clear(),
+      db.deudas.clear(),
+      db.fotos.clear(),
+      db.presupuestos.clear(),
+      db.bitcoin.clear(),
+      db.ajustes.clear(),
+    ])
+    await db.ajustes.put({ clave: CLAVE_SEMILLA, valor: '1' })
+  })
+}
+
 /** Borra todo. `conservarAjustes` deja los objetivos y preferencias en su sitio. */
 export async function borrarTodo(conservarAjustes = true): Promise<void> {
   await db.transaction('rw', [db.movimientos, db.categorias, db.cuentas, db.deudas, db.fotos, db.presupuestos, db.ajustes, db.bitcoin], async () => {

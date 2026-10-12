@@ -393,6 +393,51 @@ async function main() {
       `Y con las flechas se vuelve al mes de partida (${mesInicial} → ${mesAtras} → ${mesFinal})`,
     )
 
+    // =====================================================================
+    // 9. Ajustes: los objetivos y las dos operaciones destructivas
+    // =====================================================================
+    await pagina.getByRole('button', { name: 'Ajustes', exact: true }).click()
+    await pagina.getByText('Copia de seguridad', { exact: true }).waitFor({ timeout: 10_000 })
+
+    // --- Los objetivos se guardan al salir del campo ---
+    const objetivoInversion = pagina.getByLabel('Inversión mensual (MSCI World)')
+    await objetivoInversion.fill('250')
+    await objetivoInversion.blur()
+    await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
+    await pagina.getByText('Gastado este mes').waitFor({ timeout: 10_000 })
+    comprueba.comprueba(
+      await aparece('/ 250,00'),
+      'El objetivo de inversión se guarda solo al salir del campo y sale en Inicio',
+    )
+
+    // --- Recargar el histórico del Excel ---
+    await pagina.getByRole('button', { name: 'Ajustes', exact: true }).click()
+    await pagina.getByRole('button', { name: 'Recargar el histórico del Excel' }).click()
+    await pagina.getByRole('button', { name: 'Confirmar: se borra lo que hayas apuntado' }).click()
+    comprueba.comprueba(
+      await aparece('Histórico del Excel recargado'),
+      'Recargar el histórico pide confirmación antes de borrar nada',
+    )
+
+    await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
+    await pagina.getByText('Gastado este mes').waitFor({ timeout: 10_000 })
+    comprueba.comprueba(true, 'Y no vuelve a salir la pantalla de bienvenida')
+
+    await pagina.getByRole('button', { name: 'Ver todos' }).click()
+    comprueba.comprueba(
+      await aparece('24 movimientos'),
+      'El histórico vuelve a estar como el primer día (24 movimientos)',
+    )
+
+    // --- Borrar todos los datos ---
+    await pagina.getByRole('button', { name: 'Ajustes', exact: true }).click()
+    await pagina.getByRole('button', { name: 'Borrar todos los datos' }).click()
+    await pagina.getByRole('button', { name: 'Confirmar: borrar TODO' }).click()
+    comprueba.comprueba(
+      await aparece('Apuntar mi primer gasto'),
+      'Borrar todos los datos deja la app como recién instalada (vuelve la bienvenida)',
+    )
+
     comprueba.comprueba(errores.length === 0, `Sin errores en consola${errores.length ? `: ${errores[0]}` : ''}`)
   } finally {
     await navegador.close()
