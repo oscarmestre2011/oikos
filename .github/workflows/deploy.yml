@@ -1,0 +1,75 @@
+# Publica Oikos en GitHub Pages.
+#
+# Por que este flujo es tan pesado antes de publicar: Oikos no vive en la raiz del dominio,
+# sino en `https://<usuario>.github.io/oikos/`. Ese detalle es el que deja la app EN BLANCO
+# (rutas mal, ambito del service worker mal y modo sin conexion roto) y en local no se ve,
+# porque en local se sirve desde la raiz. Por eso aqui se compila EN MODO SUBCARPETA y se
+# comprueba el resultado con `test:pages` antes de publicar nada.
+#
+# Si el flujo falla, NO se publica: se queda la version anterior, que funciona.
+
+name: Publicar Oikos
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Si se suben dos cambios seguidos, se cancela el anterior: no tiene sentido publicar dos veces.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  comprobar:
+    name: Comprobar que todo funciona
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` en lugar de `npm install`: instala EXACTAMENTE lo del package-lock.json, que
+      # es la unica forma de que lo que se comprueba aqui sea lo que se compila en casa.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Revisar los tipos
+        run: npm run typecheck
+
+      - name: Pruebas de la logica y de los datos
+        run: npm test
+
+      - name: Compilar para la subcarpeta
+        run: npm run build:pages
+
+      - name: Instalar el navegador de las pruebas
+        run: npx playwright install --with-deps chromium
+
+      - name: Comprobar el despliegue en subcarpeta (incluye modo sin conexion)
+        run: npm run test:pages
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  publicar:
+    name: Publicar
+    needs: comprobar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4

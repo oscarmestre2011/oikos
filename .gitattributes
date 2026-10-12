@@ -1,0 +1,11 @@
+# Normalizacion de finales de linea.
+#
+# Importa porque el proyecto se toca desde Windows (el portatil) y se compila en Linux
+# (GitHub Actions). Sin esto, Git avisa de que "todo el fichero ha cambiado" cada vez que se
+# pasa de un sistema al otro, y en un diff no se ve que ha cambiado de verdad.
+* text=auto eol=lf
+
+# Los binarios no se tocan.
+*.png binary
+*.jpg binary
+*.ico binary

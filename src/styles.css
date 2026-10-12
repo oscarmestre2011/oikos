@@ -1,0 +1,751 @@
+/*
+ * Estilos de Oikos.
+ *
+ * Pensado para el movil, de noche y en el bolsillo: fondo oscuro, numeros grandes y areas
+ * tactiles de 44 px como minimo (por debajo de eso, con el dedo se falla).
+ *
+ * La paleta es hermana de la de Kairos (carbon + dorado) pero con los colores de estado
+ * cambiados de sentido: aqui el ROJO es gasto o deuda, el VERDE es que vas bien, y el
+ * dorado es el dinero que se queda (inversion y patrimonio).
+ */
+
+:root {
+  --carbon: #12161c;
+  --carbon-claro: #1a2029;
+  --superficie: #1e2530;
+  --superficie-alta: #262f3d;
+  --borde: #2f3947;
+  --texto: #e8ecf1;
+  --texto-suave: #98a4b5;
+  --texto-tenue: #6b7787;
+
+  --dorado: #d9b25f;
+  --dorado-suave: #3a3222;
+  --verde: #4ec98a;
+  --verde-suave: #17352a;
+  --rojo: #ef6b6b;
+  --rojo-suave: #3a2020;
+  --ambar: #e5a83c;
+  --ambar-suave: #3a2f1a;
+
+  --radio: 14px;
+  --radio-pequeno: 10px;
+  --sombra: 0 2px 12px rgba(0, 0, 0, 0.35);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--carbon);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------- Estructura */
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.contenido {
+  flex: 1;
+  padding: 12px 14px calc(84px + env(safe-area-inset-bottom));
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.cabecera {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background: color-mix(in srgb, var(--carbon) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--borde);
+}
+
+.cabecera__titulo {
+  font-size: 1.05rem;
+  font-weight: 650;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.cabecera__subtitulo {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--texto-suave);
+  font-weight: 400;
+}
+
+.cabecera__marca {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- Navegacion */
+
+.barra-inferior {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--carbon-claro) 96%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--borde);
+}
+
+.barra-inferior__boton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border-radius: var(--radio-pequeno);
+  color: var(--texto-tenue);
+  font-size: 0.68rem;
+  font-weight: 550;
+  transition: color 0.15s, background 0.15s;
+}
+
+.barra-inferior__boton[aria-current='page'] {
+  color: var(--dorado);
+  background: var(--dorado-suave);
+}
+
+.barra-inferior__icono {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------- Tarjetas */
+
+.tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.tarjeta--sin-relleno {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tarjeta--destacada {
+  background: linear-gradient(160deg, var(--superficie-alta), var(--superficie));
+  border-color: color-mix(in srgb, var(--dorado) 35%, var(--borde));
+}
+
+.tarjeta__titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+.tarjeta__titulo--accion {
+  justify-content: space-between;
+}
+
+.tarjeta__accion {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--dorado);
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 4px 6px;
+  margin: -4px -6px;
+}
+
+.tarjeta__pie {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--borde);
+  font-size: 0.78rem;
+  color: var(--texto-suave);
+}
+
+/* ---------------------------------------------------------------- Cifras */
+
+.cifra {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.cifra--mediana {
+  font-size: 1.35rem;
+}
+
+.cifra--pequena {
+  font-size: 1.05rem;
+}
+
+.cifra--positiva {
+  color: var(--verde);
+}
+
+.cifra--negativa {
+  color: var(--rojo);
+}
+
+.cifra--dorada {
+  color: var(--dorado);
+}
+
+.cifra__etiqueta {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 550;
+  color: var(--texto-suave);
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------- Rejillas */
+
+.rejilla {
+  display: grid;
+  gap: 10px;
+}
+
+.rejilla--2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.rejilla--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.rejilla--4 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 520px) {
+  .rejilla--4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.rejilla__celda {
+  background: var(--superficie-alta);
+  border-radius: var(--radio-pequeno);
+  padding: 10px 12px;
+}
+
+/* ---------------------------------------------------------------- Botones */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 10px 16px;
+  border-radius: var(--radio-pequeno);
+  background: var(--superficie-alta);
+  border: 1px solid var(--borde);
+  font-weight: 620;
+  font-size: 0.95rem;
+  transition: transform 0.08s, background 0.15s;
+}
+
+.boton:active {
+  transform: scale(0.98);
+}
+
+.boton--principal {
+  background: var(--dorado);
+  border-color: var(--dorado);
+  color: #1a1408;
+}
+
+.boton--ancho {
+  width: 100%;
+}
+
+.boton--peligro {
+  color: var(--rojo);
+  border-color: color-mix(in srgb, var(--rojo) 40%, var(--borde));
+}
+
+.boton--pequeno {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+.boton:disabled {
+  opacity: 0.45;
+}
+
+/* ---------------------------------------------------------------- Chips */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--superficie-alta);
+  border: 1px solid var(--borde);
+  font-size: 0.88rem;
+  font-weight: 550;
+  color: var(--texto-suave);
+}
+
+.chip[aria-pressed='true'],
+.chip--activo {
+  background: var(--dorado-suave);
+  border-color: var(--dorado);
+  color: var(--dorado);
+}
+
+.chip--gasto[aria-pressed='true'] {
+  background: var(--rojo-suave);
+  border-color: var(--rojo);
+  color: var(--rojo);
+}
+
+.chip--inversion[aria-pressed='true'] {
+  background: var(--verde-suave);
+  border-color: var(--verde);
+  color: var(--verde);
+}
+
+.chip--ingreso[aria-pressed='true'] {
+  background: var(--verde-suave);
+  border-color: var(--verde);
+  color: var(--verde);
+}
+
+/* ---------------------------------------------------------------- Listas */
+
+.lista {
+  display: flex;
+  flex-direction: column;
+}
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--borde);
+  text-align: left;
+  width: 100%;
+  background: none;
+}
+
+.fila:last-child {
+  border-bottom: none;
+}
+
+.fila__principal {
+  flex: 1;
+  min-width: 0;
+  /* `display: block` es imprescindible: sin el, el titulo y el detalle de una fila se
+     dibujan en la misma linea y el texto sale pegado ("Alimentacion12,50 EUR"). */
+  display: block;
+}
+
+.fila__titulo {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fila__detalle {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--texto-suave);
+}
+
+.fila__importe {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fila__importe--gasto {
+  color: var(--rojo);
+}
+
+.fila__importe--ingreso {
+  color: var(--verde);
+}
+
+.fila__importe--inversion,
+.fila__importe--amortizacion {
+  color: var(--dorado);
+}
+
+.cabecera-dia {
+  padding: 12px 14px 4px;
+  font-size: 0.74rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--texto-tenue);
+  background: var(--superficie);
+}
+
+/* ---------------------------------------------------------------- Barras */
+
+.barra {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--superficie-alta);
+  overflow: hidden;
+}
+
+.barra__relleno {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--dorado);
+  transition: width 0.3s;
+}
+
+.barra__relleno--holgado {
+  background: var(--verde);
+}
+
+.barra__relleno--ajustado {
+  background: var(--ambar);
+}
+
+.barra__relleno--pasado {
+  background: var(--rojo);
+}
+
+.fila-barra {
+  display: grid;
+  gap: 5px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.fila-barra:last-child {
+  border-bottom: none;
+}
+
+.fila-barra__cabeza {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.fila-barra__importe {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.fila-barra__nota {
+  font-size: 0.74rem;
+  color: var(--texto-suave);
+}
+
+/* ---------------------------------------------------------------- Avisos */
+
+.aviso {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radio-pequeno);
+  background: var(--superficie-alta);
+  border: 1px solid var(--borde);
+  font-size: 0.85rem;
+  color: var(--texto);
+  margin-bottom: 12px;
+}
+
+.aviso__icono {
+  flex: none;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.aviso--info {
+  background: var(--superficie-alta);
+}
+
+.aviso--atencion {
+  background: var(--ambar-suave);
+  border-color: color-mix(in srgb, var(--ambar) 45%, var(--borde));
+}
+
+.aviso--peligro {
+  background: var(--rojo-suave);
+  border-color: color-mix(in srgb, var(--rojo) 45%, var(--borde));
+}
+
+.aviso--bien {
+  background: var(--verde-suave);
+  border-color: color-mix(in srgb, var(--verde) 45%, var(--borde));
+}
+
+.aviso strong {
+  color: var(--texto);
+}
+
+/* ---------------------------------------------------------------- Teclado */
+
+.teclado {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.teclado__tecla {
+  min-height: 58px;
+  border-radius: var(--radio-pequeno);
+  background: var(--superficie-alta);
+  border: 1px solid var(--borde);
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.teclado__tecla:active {
+  background: var(--borde);
+}
+
+.teclado__tecla--accion {
+  font-size: 1.1rem;
+  color: var(--texto-suave);
+}
+
+.pantalla-importe {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 0 14px;
+}
+
+.pantalla-importe__valor {
+  font-size: 2.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.pantalla-importe__moneda {
+  font-size: 1.5rem;
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+.pantalla-importe__vacio {
+  color: var(--texto-tenue);
+}
+
+/* ---------------------------------------------------------------- Formulario */
+
+.campo {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.campo__etiqueta {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.entrada {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border-radius: var(--radio-pequeno);
+  background: var(--superficie-alta);
+  border: 1px solid var(--borde);
+}
+
+.entrada:focus {
+  outline: 2px solid var(--dorado);
+  outline-offset: -1px;
+}
+
+/* ---------------------------------------------------------------- Grafica */
+
+.grafica {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.grafica__linea {
+  fill: none;
+  stroke: var(--dorado);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.grafica__area {
+  fill: color-mix(in srgb, var(--dorado) 16%, transparent);
+  stroke: none;
+}
+
+.grafica__punto {
+  fill: var(--dorado);
+}
+
+.grafica__rejilla {
+  stroke: var(--borde);
+  stroke-width: 1;
+}
+
+.grafica__texto {
+  fill: var(--texto-tenue);
+  font-size: 9px;
+}
+
+.grafica__cero {
+  stroke: var(--rojo);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+/* ---------------------------------------------------------------- Varios */
+
+.vacio {
+  padding: 26px 16px;
+  text-align: center;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+
+.separador {
+  height: 1px;
+  background: var(--borde);
+  margin: 14px 0;
+}
+
+.etiqueta {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  background: var(--superficie-alta);
+  color: var(--texto-suave);
+  border: 1px solid var(--borde);
+}
+
+.etiqueta--excel {
+  background: var(--dorado-suave);
+  color: var(--dorado);
+  border-color: color-mix(in srgb, var(--dorado) 40%, var(--borde));
+}
+
+.etiqueta--sugerida {
+  background: transparent;
+  color: var(--texto-tenue);
+}
+
+.texto-suave {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.texto-tenue {
+  color: var(--texto-tenue);
+  font-size: 0.78rem;
+}
+
+.en-linea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reparte {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cargando {
+  display: grid;
+  place-items: center;
+  min-height: 60dvh;
+  color: var(--texto-suave);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

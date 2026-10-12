@@ -1,0 +1,662 @@
+import { useMemo, useState } from 'react'
+import { Aviso } from '../components/Aviso'
+import { Cifra } from '../components/Cifra'
+import { Grafica } from '../components/Grafica'
+import { Tarjeta } from '../components/Tarjeta'
+import { borraDeuda, borraFoto, guardaDeuda, guardaFoto } from '../db/repository'
+import { useComprasBitcoin, useCuentas, useDeudas, useFotos } from '../hooks'
+import { formateaCompacto, formateaImporte, parseaImporte, redondea } from '../lib/dinero'
+import { formateaFecha, formateaFechaCorta, nombreMesCorto, mesDe } from '../lib/fechas'
+import { calculaPatrimonio, seriePatrimonio, totalDeuda, ultimaFoto, ultimosValores, valorEn } from '../lib/patrimonio'
+import type { PropsPantalla } from '../navegacion'
+import type { Deuda, FotoPatrimonio, ValorCuenta } from '../types'
+
+interface Props extends PropsPantalla {
+  onError: (mensaje: string) => void
+}
+
+type Modo = 'ver' | 'foto' | 'deudas'
+
+export function Patrimonio({ hoy, onError }: Props) {
+  const cuentas = useCuentas()
+  const deudas = useDeudas()
+  const fotos = useFotos()
+  const comprasBitcoin = useComprasBitcoin()
+
+  const [modo, setModo] = useState<Modo>('ver')
+  const [fechaFoto, setFechaFoto] = useState(hoy)
+  const [notasFoto, setNotasFoto] = useState('')
+  const [borrador, setBorrador] = useState<Record<string, string>>({})
+  const [deudaEnEdicion, setDeudaEnEdicion] = useState<Deuda | 'nueva' | null>(null)
+  const [confirmarBorrado, setConfirmarBorrado] = useState<number | null>(null)
+
+  const fotoActual = useMemo(() => ultimaFoto(fotos), [fotos])
+  const serie = useMemo(() => seriePatrimonio(fotos, cuentas), [fotos, cuentas])
+  const patrimonio = useMemo(
+    () => calculaPatrimonio(fotoActual ?? undefined, cuentas, deudas),
+    [fotoActual, cuentas, deudas],
+  )
+  const deudaTotal = useMemo(() => totalDeuda(deudas), [deudas])
+  const ultimos = useMemo(() => ultimosValores(fotos), [fotos])
+
+  const cuentasActivas = cuentas.filter((c) => c.activa)
+  const liquidez = cuentasActivas.filter((c) => c.bloque === 'liquidez')
+  const activos = cuentasActivas.filter((c) => c.bloque === 'activo')
+
+  const bitcoinTotal = useMemo(() => {
+    const cantidad = comprasBitcoin.reduce((t, c) => t + c.cantidadBtc, 0)
+    const invertido = comprasBitcoin.reduce((t, c) => t + (c.importe ?? 0), 0)
+    const valorActual = valorEn(fotoActual ?? undefined, 'Bitcoin') ?? 0
+    return {
+      cantidad,
+      invertido: redondea(invertido),
+      precioMedio: cantidad > 0 ? redondea(invertido / cantidad) : 0,
+      valorActual,
+      resultado: redondea(valorActual - invertido),
+    }
+  }, [comprasBitcoin, fotoActual])
+
+  const abrirFoto = () => {
+    // Se precarga con lo que valian las cuentas la ultima vez: casi todos los meses basta
+    // con corregir dos o tres numeros.
+    const inicial: Record<string, string> = {}
+    for (const cuenta of cuentasActivas) {
+      const valor = fotoActual ? valorEn(fotoActual, cuenta.nombre) ?? ultimos[cuenta.nombre] : ultimos[cuenta.nombre]
+      inicial[cuenta.nombre] = valor === undefined ? '' : String(valor).replace('.', ',')
+    }
+    setBorrador(inicial)
+    setFechaFoto(hoy)
+    setNotasFoto('')
+    setModo('foto')
+  }
+
+  const guardarFotoActual = async () => {
+    const valores: ValorCuenta[] = []
+    for (const cuenta of cuentasActivas) {
+      const texto = borrador[cuenta.nombre]
+      if (!texto || !texto.trim()) continue
+      const importe = parseaImporte(texto)
+      if (importe === null) {
+        onError(`El valor de "${cuenta.nombre}" no se entiende.`)
+        return
+      }
+      valores.push({ cuenta: cuenta.nombre, importe })
+    }
+    if (valores.length === 0) {
+      onError('No hay ningún valor que guardar.')
+      return
+    }
+
+    const yaExiste = fotos.find((f) => f.fecha === fechaFoto)
+    const foto: FotoPatrimonio = {
+      fecha: fechaFoto,
+      valores,
+      notas: notasFoto.trim() || undefined,
+      origen: 'manual',
+      fechaAproximada: false,
+      ...(yaExiste?.id ? { id: yaExiste.id } : {}),
+    }
+    try {
+      await guardaFoto(foto)
+      setModo('ver')
+    } catch (error) {
+      onError(`No se pudo guardar la foto: ${(error as Error).message}`)
+    }
+  }
+
+  const borrarFotoDelDia = async (id: number) => {
+    try {
+      await borraFoto(id)
+    } catch (error) {
+      onError(`No se pudo borrar: ${(error as Error).message}`)
+    }
+  }
+
+  const guardarDeuda = async (deuda: Deuda) => {
+    try {
+      await guardaDeuda(deuda)
+      setDeudaEnEdicion(null)
+    } catch (error) {
+      onError(`No se pudo guardar la deuda: ${(error as Error).message}`)
+    }
+  }
+
+  // ---------------------------------------------------------------- Modo foto
+  if (modo === 'foto') {
+    return (
+      <div>
+        <Tarjeta titulo="Foto del patrimonio">
+          <div className="campo">
+            <label className="campo__etiqueta" htmlFor="fecha-foto">
+              Fecha de la foto
+            </label>
+            <input
+              id="fecha-foto"
+              className="entrada"
+              type="date"
+              value={fechaFoto}
+              onChange={(evento) => setFechaFoto(evento.target.value)}
+            />
+          </div>
+          {fotos.some((f) => f.fecha === fechaFoto) && (
+            <Aviso tono="atencion">
+              Ya hay una foto de ese día. Si guardas, se <strong>reemplaza</strong> por estos valores.
+            </Aviso>
+          )}
+          <p className="texto-tenue" style={{ marginBottom: 0 }}>
+            Vienen rellenadas con los valores de la última foto. Corrige lo que haya cambiado y deja
+            en blanco lo que no quieras guardar.
+          </p>
+        </Tarjeta>
+
+        {[
+          { titulo: 'Liquidez', lista: liquidez },
+          { titulo: 'Inversiones y activos', lista: activos },
+        ].map((bloque) => (
+          <Tarjeta key={bloque.titulo} titulo={bloque.titulo}>
+            {bloque.lista.map((cuenta) => (
+              <div className="campo" key={cuenta.nombre}>
+                <label className="campo__etiqueta" htmlFor={`foto-${cuenta.nombre}`}>
+                  {cuenta.nombre}
+                </label>
+                <input
+                  id={`foto-${cuenta.nombre}`}
+                  className="entrada"
+                  type="text"
+                  inputMode="decimal"
+                  value={borrador[cuenta.nombre] ?? ''}
+                  onChange={(evento) =>
+                    setBorrador((anterior) => ({ ...anterior, [cuenta.nombre]: evento.target.value }))
+                  }
+                />
+              </div>
+            ))}
+          </Tarjeta>
+        ))}
+
+        <Tarjeta titulo="Notas">
+          <textarea
+            className="entrada"
+            rows={2}
+            value={notasFoto}
+            placeholder="Por ejemplo: mes con la extra de junio"
+            onChange={(evento) => setNotasFoto(evento.target.value)}
+          />
+        </Tarjeta>
+
+        <button type="button" className="boton boton--principal boton--ancho" onClick={guardarFotoActual}>
+          Guardar la foto
+        </button>
+        <button
+          type="button"
+          className="boton boton--ancho"
+          style={{ marginTop: 10 }}
+          onClick={() => setModo('ver')}
+        >
+          Cancelar
+        </button>
+      </div>
+    )
+  }
+
+  // -------------------------------------------------------------- Modo deudas
+  if (modo === 'deudas') {
+    return (
+      <div>
+        <Tarjeta titulo="Mis deudas">
+          <Cifra valor={formateaImporte(deudaTotal.propia)} etiqueta="Deuda propia" tono="negativa" />
+          {deudaTotal.compartida > 0 && (
+            <p className="texto-suave" style={{ marginBottom: 0 }}>
+              Además hay {formateaImporte(deudaTotal.compartida)} de deuda compartida (la paga otra
+              persona, pero el riesgo es tuyo). No entra en el neto.
+            </p>
+          )}
+        </Tarjeta>
+
+        {deudas.map((deuda) =>
+          deudaEnEdicion !== 'nueva' && deudaEnEdicion?.id === deuda.id ? (
+            <FormularioDeuda
+              key={deuda.id}
+              inicial={deuda}
+              onGuardar={guardarDeuda}
+              onCancelar={() => setDeudaEnEdicion(null)}
+              onBorrar={async () => {
+                if (confirmarBorrado !== deuda.id) {
+                  setConfirmarBorrado(deuda.id ?? null)
+                  return
+                }
+                if (deuda.id) await borraDeuda(deuda.id)
+                setDeudaEnEdicion(null)
+                setConfirmarBorrado(null)
+              }}
+              confirmarBorrado={confirmarBorrado === deuda.id}
+            />
+          ) : (
+            <Tarjeta key={deuda.id}>
+              <div className="reparte">
+                <span className="fila__principal">
+                  <span className="fila__titulo">
+                    {deuda.nombre} {deuda.compartida && <span className="etiqueta">compartida</span>}
+                  </span>
+                  <span className="fila__detalle">
+                    saldo a {formateaFechaCorta(deuda.fechaSaldo)}
+                    {deuda.interes ? ` · ${deuda.interes} %` : ''}
+                    {deuda.vence ? ` · vence ${formateaFechaCorta(deuda.vence)}` : ''}
+                  </span>
+                </span>
+                <span className="fila__importe fila__importe--gasto">{formateaImporte(deuda.saldo)}</span>
+              </div>
+              {deuda.notas && <p className="texto-tenue">{deuda.notas}</p>}
+              <div className="en-linea" style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="boton boton--pequeno"
+                  onClick={() => {
+                    setConfirmarBorrado(null)
+                    setDeudaEnEdicion(deuda)
+                  }}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  className="boton boton--pequeno"
+                  onClick={async () => {
+                    await guardaDeuda({ ...deuda, activa: !deuda.activa })
+                  }}
+                >
+                  {deuda.activa ? 'Marcar como pagada' : 'Volver a activar'}
+                </button>
+                {!deuda.activa && <span className="etiqueta">inactiva</span>}
+              </div>
+            </Tarjeta>
+          ),
+        )}
+
+        {deudaEnEdicion === 'nueva' ? (
+          <FormularioDeuda
+            inicial={{
+              nombre: '',
+              saldo: 0,
+              fechaSaldo: hoy,
+              compartida: false,
+              activa: true,
+            }}
+            onGuardar={guardarDeuda}
+            onCancelar={() => setDeudaEnEdicion(null)}
+          />
+        ) : (
+          <button
+            type="button"
+            className="boton boton--ancho"
+            onClick={() => {
+              setConfirmarBorrado(null)
+              setDeudaEnEdicion('nueva')
+            }}
+          >
+            + Añadir una deuda
+          </button>
+        )}
+
+        <button
+          type="button"
+          className="boton boton--ancho"
+          style={{ marginTop: 10 }}
+          onClick={() => setModo('ver')}
+        >
+          Volver
+        </button>
+      </div>
+    )
+  }
+
+  // ------------------------------------------------------------------ Modo ver
+  const primera = serie[0]
+  const ultima = serie[serie.length - 1]
+
+  return (
+    <div>
+      <Tarjeta destacada>
+        <span className="cifra__etiqueta">
+          Patrimonio neto {fotoActual ? `· ${formateaFecha(fotoActual.fecha)}` : ''}
+        </span>
+        <Cifra valor={formateaImporte(patrimonio.neto)} tono="auto" />
+        <div className="rejilla rejilla--3" style={{ marginTop: 12 }}>
+          <div className="rejilla__celda">
+            <span className="cifra__etiqueta">Cuentas</span>
+            <div className="cifra cifra--pequena">{formateaImporte(patrimonio.liquidez)}</div>
+          </div>
+          <div className="rejilla__celda">
+            <span className="cifra__etiqueta">Inversiones</span>
+            <div className="cifra cifra--pequena">{formateaImporte(patrimonio.activos)}</div>
+          </div>
+          <div className="rejilla__celda">
+            <span className="cifra__etiqueta">Deuda</span>
+            <div className="cifra cifra--pequena cifra--negativa">−{formateaImporte(patrimonio.deuda)}</div>
+          </div>
+        </div>
+        {patrimonio.neto < 0 && (
+          <p className="texto-suave" style={{ marginBottom: 0 }}>
+            Sale negativo, y es correcto: debes más de lo que tienes. Lo que <em>no</em> es correcto es
+            el número del Excel, que sumaba las cuentas y los fondos pero no restaba ni la hipoteca.
+          </p>
+        )}
+      </Tarjeta>
+
+      <Aviso tono="info">
+        Las cuatro deudas vienen de tu <strong>Plan de libertad financiera 2026-2036</strong> (30-09-2026).
+        Compruébalas y corrígelas: si el saldo de la hipoteca ha bajado, el neto cambia.{' '}
+        <button type="button" className="tarjeta__accion" onClick={() => setModo('deudas')}>
+          Revisar las deudas
+        </button>
+      </Aviso>
+
+      <Tarjeta
+        titulo="Evolución"
+        accion={
+          <button type="button" className="tarjeta__accion" onClick={abrirFoto}>
+            📸 Hacer la foto de hoy
+          </button>
+        }
+      >
+        {serie.length >= 2 && (
+          <>
+            <Grafica
+              titulo="Evolución del patrimonio"
+              puntos={serie.map((punto) => ({ etiqueta: nombreMesCorto(mesDe(punto.fecha)), valor: punto.bruto }))}
+              formatea={formateaCompacto}
+              maximo={18}
+            />
+            <div className="rejilla rejilla--3" style={{ marginTop: 10 }}>
+              <div className="rejilla__celda">
+                <span className="cifra__etiqueta">Primera · {nombreMesCorto(mesDe(primera.fecha))}</span>
+                <div className="cifra cifra--pequena">{formateaImporte(primera.bruto)}</div>
+              </div>
+              <div className="rejilla__celda">
+                <span className="cifra__etiqueta">Última · {nombreMesCorto(mesDe(ultima.fecha))}</span>
+                <div className="cifra cifra--pequena">{formateaImporte(ultima.bruto)}</div>
+              </div>
+              <div className="rejilla__celda">
+                <span className="cifra__etiqueta">Diferencia</span>
+                <div className={`cifra cifra--pequena ${ultima.bruto - primera.bruto < 0 ? 'cifra--negativa' : 'cifra--positiva'}`}>
+                  {formateaImporte(redondea(ultima.bruto - primera.bruto))}
+                </div>
+              </div>
+            </div>
+            <p className="texto-tenue" style={{ marginBottom: 0 }}>
+              Esta línea es patrimonio BRUTO (cuentas + inversiones). La deuda no se puede restar hacia
+              atrás: tu Excel no la registraba y no hay forma de saber cuánto se debía en cada mes.
+              Inventarlo sería peor que no enseñarlo.
+            </p>
+          </>
+        )}
+      </Tarjeta>
+
+      <Tarjeta
+        titulo="Mis cuentas"
+        sinRelleno
+        accion={
+          <button type="button" className="tarjeta__accion" onClick={() => setModo('deudas')}>
+            Deudas
+          </button>
+        }
+      >
+        {[
+          { titulo: 'Liquidez', lista: liquidez },
+          { titulo: 'Inversiones', lista: activos },
+        ].map((bloque) => (
+          <div key={bloque.titulo}>
+            <div className="cabecera-dia">{bloque.titulo}</div>
+            {bloque.lista.map((cuenta) => {
+              const valor = fotoActual ? valorEn(fotoActual, cuenta.nombre) : undefined
+              return (
+                <div className="fila" key={cuenta.nombre}>
+                  <span className="fila__principal">
+                    <span className="fila__titulo">{cuenta.nombre}</span>
+                    <span className="fila__detalle">
+                      {valor === undefined ? 'sin valor en la última foto' : `el ${formateaFechaCorta(fotoActual!.fecha)}`}
+                    </span>
+                  </span>
+                  <span className="fila__importe">{valor === undefined ? '—' : formateaImporte(valor)}</span>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+        <div className="fila">
+          <span className="fila__principal">
+            <span className="fila__titulo">Total bruto</span>
+          </span>
+          <span className="fila__importe">{formateaImporte(patrimonio.bruto)}</span>
+        </div>
+      </Tarjeta>
+
+      {comprasBitcoin.length > 0 && (
+        <Tarjeta titulo="Bitcoin">
+          <Cifra
+            valor={`${bitcoinTotal.cantidad.toFixed(8)} BTC`}
+            etiqueta="Compras anotadas (oct-dic 2025)"
+            tamano="mediana"
+          />
+          <div className="rejilla rejilla--2" style={{ marginTop: 12 }}>
+            <div className="rejilla__celda">
+              <span className="cifra__etiqueta">Invertido</span>
+              <div className="cifra cifra--pequena">{formateaImporte(bitcoinTotal.invertido)}</div>
+            </div>
+            <div className="rejilla__celda">
+              <span className="cifra__etiqueta">Precio medio de compra</span>
+              <div className="cifra cifra--pequena">{formateaImporte(bitcoinTotal.precioMedio)}</div>
+            </div>
+            <div className="rejilla__celda">
+              <span className="cifra__etiqueta">Valor en la última foto</span>
+              <div className="cifra cifra--pequena">{formateaImporte(bitcoinTotal.valorActual)}</div>
+            </div>
+            <div className="rejilla__celda">
+              <span className="cifra__etiqueta">Resultado</span>
+              <div className={bitcoinTotal.resultado < 0 ? 'cifra cifra--pequena cifra--negativa' : 'cifra cifra--pequena cifra--positiva'}>
+                {formateaImporte(bitcoinTotal.resultado)}
+              </div>
+            </div>
+          </div>
+          <p className="texto-tenue" style={{ marginBottom: 0 }}>
+            Ojo: estas {comprasBitcoin.length} compras son solo las de la hoja «Bitcoin 2025» (0,11623313 BTC).
+            Tu plan de septiembre de 2026 declara 0,19426538 BTC, así que hay compras anteriores que no
+            están en esa hoja. El total bueno es el de la cuenta Bitcoin de la última foto.
+          </p>
+        </Tarjeta>
+      )}
+
+      <Tarjeta titulo="Fotos guardadas" sinRelleno>
+        <div className="lista">
+          {[...fotos]
+            .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+            .slice(0, 12)
+            .map((foto) => (
+              <div className="fila" key={foto.id ?? foto.fecha}>
+                <span className="fila__principal">
+                  <span className="fila__titulo">{formateaFecha(foto.fecha)}</span>
+                  <span className="fila__detalle">
+                    {foto.origen === 'excel' ? (
+                      <span className="etiqueta etiqueta--excel">del Excel</span>
+                    ) : (
+                      <span className="etiqueta">apuntada a mano</span>
+                    )}
+                    {foto.fechaAproximada && ' · fecha deducida del mes'}
+                    {foto.notas ? ` · ${foto.notas}` : ''}
+                  </span>
+                </span>
+                <span className="fila__importe">
+                  {formateaImporte(
+                    fotos.length > 0
+                      ? redondea(foto.valores.reduce((total, valor) => total + valor.importe, 0))
+                      : 0,
+                  )}
+                </span>
+                {foto.id && foto.origen === 'manual' && (
+                  <button
+                    type="button"
+                    className="boton boton--pequeno boton--peligro"
+                    onClick={() => borrarFotoDelDia(foto.id!)}
+                    aria-label={`Borrar la foto del ${foto.fecha}`}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+        </div>
+        <div className="tarjeta__pie">
+          {fotos.length} fotos · desde {fotos.length > 0 ? formateaFecha(fotos[0].fecha) : '—'} ·{' '}
+          <button type="button" className="tarjeta__accion" onClick={abrirFoto}>
+            Añadir una
+          </button>
+        </div>
+      </Tarjeta>
+
+      <p className="texto-tenue" style={{ textAlign: 'center' }}>
+        La primera foto (enero de 2024) y todas las del Excel son las que había en tu hoja de cálculo.
+        Solo se pueden borrar las que apuntes aquí.
+      </p>
+    </div>
+  )
+}
+
+interface PropsFormularioDeuda {
+  inicial: Deuda
+  onGuardar: (deuda: Deuda) => void
+  onCancelar: () => void
+  onBorrar?: () => void
+  confirmarBorrado?: boolean
+}
+
+function FormularioDeuda({ inicial, onGuardar, onCancelar, onBorrar, confirmarBorrado }: PropsFormularioDeuda) {
+  const [nombre, setNombre] = useState(inicial.nombre)
+  const [saldo, setSaldo] = useState(inicial.saldo ? String(inicial.saldo).replace('.', ',') : '')
+  const [fechaSaldo, setFechaSaldo] = useState(inicial.fechaSaldo)
+  const [interes, setInteres] = useState(inicial.interes ? String(inicial.interes).replace('.', ',') : '')
+  const [vence, setVence] = useState(inicial.vence ?? '')
+  const [compartida, setCompartida] = useState(inicial.compartida)
+  const [notas, setNotas] = useState(inicial.notas ?? '')
+
+  return (
+    <Tarjeta titulo={inicial.id ? 'Editar deuda' : 'Nueva deuda'}>
+      <div className="campo">
+        <label className="campo__etiqueta" htmlFor="deuda-nombre">
+          Nombre
+        </label>
+        <input
+          id="deuda-nombre"
+          className="entrada"
+          value={nombre}
+          placeholder="Hipoteca, préstamo, tarjeta…"
+          onChange={(evento) => setNombre(evento.target.value)}
+        />
+      </div>
+      <div className="campo">
+        <label className="campo__etiqueta" htmlFor="deuda-saldo">
+          Capital pendiente
+        </label>
+        <input
+          id="deuda-saldo"
+          className="entrada"
+          inputMode="decimal"
+          value={saldo}
+          onChange={(evento) => setSaldo(evento.target.value)}
+        />
+      </div>
+      <div className="campo">
+        <label className="campo__etiqueta" htmlFor="deuda-fecha">
+          Saldo a fecha de
+        </label>
+        <input
+          id="deuda-fecha"
+          className="entrada"
+          type="date"
+          value={fechaSaldo}
+          onChange={(evento) => setFechaSaldo(evento.target.value)}
+        />
+      </div>
+      <div className="rejilla rejilla--2">
+        <div className="campo">
+          <label className="campo__etiqueta" htmlFor="deuda-interes">
+            Interés anual (%)
+          </label>
+          <input
+            id="deuda-interes"
+            className="entrada"
+            inputMode="decimal"
+            value={interes}
+            onChange={(evento) => setInteres(evento.target.value)}
+          />
+        </div>
+        <div className="campo">
+          <label className="campo__etiqueta" htmlFor="deuda-vence">
+            Vence
+          </label>
+          <input
+            id="deuda-vence"
+            className="entrada"
+            type="date"
+            value={vence}
+            onChange={(evento) => setVence(evento.target.value)}
+          />
+        </div>
+      </div>
+      <div className="campo">
+        <label className="campo__etiqueta" htmlFor="deuda-notas">
+          Notas
+        </label>
+        <textarea
+          id="deuda-notas"
+          className="entrada"
+          rows={2}
+          value={notas}
+          onChange={(evento) => setNotas(evento.target.value)}
+        />
+      </div>
+      <label className="en-linea" style={{ marginBottom: 12 }}>
+        <input
+          type="checkbox"
+          checked={compartida}
+          onChange={(evento) => setCompartida(evento.target.checked)}
+        />
+        <span>
+          La paga otra persona
+          <br />
+          <span className="texto-tenue">
+            Se enseña aparte y no se resta del neto, pero queda fichada como riesgo tuyo.
+          </span>
+        </span>
+      </label>
+
+      <button
+        type="button"
+        className="boton boton--principal boton--ancho"
+        onClick={() => {
+          const importe = parseaImporte(saldo)
+          if (!nombre.trim() || importe === null) return
+          onGuardar({
+            ...inicial,
+            nombre: nombre.trim(),
+            saldo: Math.abs(importe),
+            fechaSaldo,
+            interes: interes ? (parseaImporte(interes) ?? undefined) : undefined,
+            vence: vence || undefined,
+            compartida,
+            notas: notas.trim() || undefined,
+          })
+        }}
+      >
+        Guardar
+      </button>
+      {onBorrar && (
+        <button type="button" className="boton boton--peligro boton--ancho" style={{ marginTop: 10 }} onClick={onBorrar}>
+          {confirmarBorrado ? 'Confirmar borrado' : 'Borrar'}
+        </button>
+      )}
+      <button type="button" className="boton boton--ancho" style={{ marginTop: 10 }} onClick={onCancelar}>
+        Cancelar
+      </button>
+    </Tarjeta>
+  )
+}
