@@ -359,6 +359,40 @@ async function main() {
       'El patrimonio neto cambia al corregir las deudas (es lo que el Excel no hacía)',
     )
 
+    // =====================================================================
+    // 8. Las flechas de mes no apilan pantallas
+    // =====================================================================
+    // Se cambió el mes que se mira para que viva en el estado de la pantalla y no en la pila de
+    // navegación, y un cambio así se deja probado: si cada flecha apilara una pantalla, después
+    // de mirar tres meses habría que pulsar "atrás" tres veces para salir, y el historial del
+    // móvil se llenaría de meses.
+    await pagina.getByRole('button', { name: 'El mes', exact: true }).click()
+    await pagina.getByRole('button', { name: 'Mes anterior' }).waitFor({ timeout: 10_000 })
+
+    // Se compara el TÍTULO DEL MES, no el texto entero de la pantalla. Comparar todo el texto era
+    // otra carrera: al entrar en la pantalla, las consultas a la base todavía están cargando, así
+    // que el texto de antes y el de después podían ser distintos por los datos y no por el mes.
+    const mesMostrado = () => pagina.locator('.reparte .cifra--mediana').first().innerText()
+    const mesInicial = await mesMostrado()
+
+    for (let i = 0; i < 3; i += 1) await pagina.getByRole('button', { name: 'Mes anterior' }).click()
+    const mesAtras = await mesMostrado()
+    comprueba.comprueba(
+      mesAtras !== mesInicial,
+      `Las flechas cambian de mes (${mesInicial} → ${mesAtras})`,
+    )
+    comprueba.comprueba(
+      (await pagina.getByRole('button', { name: 'Volver' }).count()) === 0,
+      'Mirar otros meses NO apila pantallas (no aparece el botón de volver)',
+    )
+
+    for (let i = 0; i < 3; i += 1) await pagina.getByRole('button', { name: 'Mes siguiente' }).click()
+    const mesFinal = await mesMostrado()
+    comprueba.comprueba(
+      mesFinal === mesInicial,
+      `Y con las flechas se vuelve al mes de partida (${mesInicial} → ${mesAtras} → ${mesFinal})`,
+    )
+
     comprueba.comprueba(errores.length === 0, `Sin errores en consola${errores.length ? `: ${errores[0]}` : ''}`)
   } finally {
     await navegador.close()
