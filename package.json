@@ -12,6 +12,7 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "semilla": "node scripts/generar-semilla.mjs",
+    "comprobar:flujo": "node scripts/comprobar-flujo.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:smoke": "node scripts/smoke.mjs",
@@ -21,7 +22,7 @@
     "test:live": "node scripts/verify-live.mjs",
     "publicar": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publicar.ps1",
     "verify": "npm run typecheck && npm test && npm run build",
-    "verify:all": "npm run verify && npm run test:smoke && npm run test:flujos && npm run build:pages && npm run test:pages"
+    "verify:all": "npm run comprobar:flujo && npm run verify && npm run test:smoke && npm run test:flujos && npm run build:pages && npm run test:pages"
   },
   "dependencies": {
     "dexie": "^4.0.10",
