@@ -10,7 +10,7 @@
  * OJO con la ruta: el JSON vive en `99 App Oikos/datos/`, fuera de la carpeta `oikos`.
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import type { Cuenta, Deuda, FotoPatrimonio } from '../types'
@@ -46,14 +46,31 @@ interface FotoExcel {
   neto: number
 }
 
+/*
+ * EL HISTÓRICO NO ESTÁ EN EL REPOSITORIO, y esto se aprendió publicando.
+ *
+ * `datos/historico.json` son los datos personales de Óscar y se quedó fuera del repositorio a
+ * propósito. Pero esta prueba lo leía nada más cargarse, así que en cualquier copia limpia
+ * —incluido el flujo de GitHub Actions, que clona el repositorio— el fichero no existe, la
+ * lectura revienta con ENOENT y **falla la publicación entera**. En el portátil de Óscar el
+ * fichero está, así que pasaba siempre; el fallo solo aparecía al publicar, que es justo cuando
+ * más caro sale.
+ *
+ * Ahora, si no está, la comprobación se SALTA y se dice. Sigue ejecutándose en su ordenador,
+ * que es donde tiene sentido: sin el Excel no hay nada con lo que comparar.
+ */
+const RUTA_HISTORICO = fileURLToPath(new URL('../../../datos/historico.json', import.meta.url))
+const hayHistorico = existsSync(RUTA_HISTORICO)
+
 interface Historico {
   resumen: { fotosPatrimonio: number; descuadres: number; primeraFoto: string; ultimaFoto: string }
   patrimonio: FotoExcel[]
 }
 
-const historico = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../../../datos/historico.json', import.meta.url)), 'utf8'),
-) as Historico
+const historico = hayHistorico ? (JSON.parse(readFileSync(RUTA_HISTORICO, 'utf8')) as Historico) : null
+
+/** `describe` normal si está el histórico, y saltado si no. */
+const describeConHistorico = historico ? describe : describe.skip
 
 /** Foto de patrimonio de prueba a partir de un mapa cuenta -> importe. */
 function foto(fecha: string, valores: Record<string, number>): FotoPatrimonio {
@@ -324,8 +341,8 @@ describe('variacionEntre', () => {
 // La prueba clave: las 36 fotos del Excel de Óscar
 // ---------------------------------------------------------------------------
 
-describe('las 36 fotos del histórico real cuadran con el Excel', () => {
-  const fotosExcel: [string, FotoExcel][] = historico.patrimonio.map((f) => [f.fecha, f])
+describeConHistorico('las 36 fotos del histórico real cuadran con el Excel', () => {
+  const fotosExcel: [string, FotoExcel][] = (historico?.patrimonio ?? []).map((f) => [f.fecha, f])
 
   it('el histórico trae las 36 fotos y la extracción no reconoce ningún descuadre', () => {
     expect(historico.patrimonio).toHaveLength(36)
