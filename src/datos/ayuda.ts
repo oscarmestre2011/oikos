@@ -30,15 +30,21 @@ export const AYUDA: Pregunta[] = [
   },
   {
     tema: 'Para empezar',
-    pregunta: '¿Qué datos trae ya dentro cuando la abro?',
+    pregunta: '¿Por qué la app arranca vacía? ¿No traía mi histórico?',
     respuesta:
-      'Trae tu histórico real, extraído de tu Excel: 36 fotos mensuales de patrimonio (enero de 2024 a septiembre de 2026), 89 compras de Bitcoin de la hoja «Bitcoin 2025» y los movimientos de tu Gastos 2026.csv. También trae tus categorías (Alimentación, Ocio, Deporte, Transporte, Hipoteca…) y tus deudas del Plan de libertad financiera. No hay que teclear nada para empezar.',
+      'Sí lo traía, y se quitó a propósito. Oikos se publica en internet, así que todo lo que va dentro de la app lo puede leer cualquiera: si llevara tus saldos, tu nómina o tu hipoteca, los estaría publicando. Ahora la app trae solo lo justo para funcionar (categorías y unas cuentas genéricas) y tu histórico entra desde un archivo tuyo, con Ajustes → Copia de seguridad → Importar una copia, eligiendo «Reemplazar todo por la copia». Se hace una vez y queda igual que antes.',
   },
   {
     tema: 'Para empezar',
-    pregunta: '¿Los números que trae son de fiar?',
+    pregunta: '¿Qué datos trae ya dentro cuando la abro?',
     respuesta:
-      'Las 36 fotos de patrimonio se comprobaron una a una contra las fórmulas de tu propio Excel: las sumas cuadran exactamente, sin un solo descuadre. Los datos del Bitcoin también: 0,11623313 BTC y 9.890,04 €, que es justo lo que suma tu fila de totales. Lo que sí es una estimación son las deudas, porque vienen de un documento tuyo de septiembre de 2026 y los saldos cambian cada mes.',
+      'Trae las 21 categorías de gasto, ingreso, inversión y amortización, y seis cuentas genéricas (cuenta corriente, cuenta de ahorro, efectivo, fondo de inversión, plan de pensiones y Bitcoin) para que la pantalla de patrimonio tenga sentido desde el primer día. No trae ni un movimiento, ni una foto de patrimonio, ni una deuda: esas se importan de tu archivo o las apuntas tú. Las cuentas y las categorías se renombran, se borran y se añaden desde Ajustes.',
+  },
+  {
+    tema: 'Para empezar',
+    pregunta: '¿Los números de mi copia son de fiar?',
+    respuesta:
+      'Sí, y se comprobó antes de dártela. Las 36 fotos de patrimonio de tu archivo se verifican una a una contra las fórmulas de tu propia hoja de cálculo al generarlo: las sumas cuadran exactamente, sin un solo descuadre, y si alguna no cuadrara el archivo no se generaría. Las compras de Bitcoin también cuadran con la fila de totales de tu registro. Lo único que es una estimación son los saldos de las deudas, porque vienen de un documento tuyo de septiembre de 2026 y cambian cada mes: por eso la app te invita a revisarlas.',
   },
   {
     tema: 'El día a día',
@@ -56,7 +62,7 @@ export const AYUDA: Pregunta[] = [
     tema: 'El día a día',
     pregunta: '¿Qué diferencia hay entre gasto, ingreso, inversión y amortización?',
     respuesta:
-      'Gasto es dinero que sale y no vuelve (comida, ocio, gasolina, la cuota de la hipoteca). Ingreso es dinero que entra. Inversión es dinero que sale de la cuenta pero se convierte en patrimonio tuyo (el MSCI World, Mintos, Bitcoin). Amortización es dinero que sale pero reduce lo que debes (amortizar hipoteca o préstamo). Invertir y amortizar NO se cuentan como gasto, porque ese dinero no se va: cambia de sitio.',
+      'Gasto es dinero que sale y no vuelve (comida, ocio, gasolina, la cuota de la hipoteca). Ingreso es dinero que entra. Inversión es dinero que sale de la cuenta pero se convierte en patrimonio tuyo (un fondo indexado, un plan de pensiones, criptomonedas). Amortización es dinero que sale pero reduce lo que debes (amortizar hipoteca o préstamo). Invertir y amortizar NO se cuentan como gasto, porque ese dinero no se va: cambia de sitio.',
   },
   {
     tema: 'El día a día',
@@ -80,7 +86,7 @@ export const AYUDA: Pregunta[] = [
     tema: 'Los números',
     pregunta: '¿Qué es la tasa de ahorro?',
     respuesta:
-      'El porcentaje de tus ingresos que se va a inversión y amortización. Si ingresas 2.650 € y destinas 400 €, la tasa es del 15,1 %. Es mejor indicador que "cuánto he ahorrado" en euros, porque no depende de si ese mes hubo extra.',
+      'El porcentaje de tus ingresos que se va a inversión y amortización. Si ingresas 2.000 € y destinas 300 €, la tasa es del 15 %. Es mejor indicador que "cuánto he ahorrado" en euros, porque no depende de si ese mes hubo un extra.',
   },
   {
     tema: 'Los números',
@@ -104,7 +110,7 @@ export const AYUDA: Pregunta[] = [
     tema: 'Los números',
     pregunta: '¿Por qué el detalle de gastos empieza en marzo de 2026?',
     respuesta:
-      'Porque es lo que hay. Tu Excel guardaba el patrimonio mes a mes, pero el detalle de cada gasto solo está en el Gastos 2026.csv, que empieza el 26 de marzo de 2026. De los meses anteriores no hay gastos apuntados en ninguna parte, así que la app no se los puede inventar. Por eso las comparaciones con la media empiezan a tener sentido a partir del segundo mes con datos.',
+      'Porque el histórico que importaste solo trae el detalle de los gastos desde la primera fecha que hubiera en tu registro. Muchas personas llevan meses (o años) apuntando el patrimonio mes a mes, pero no cada gasto suelto: de esos meses la app puede enseñar cuánto tenías, pero no en qué se fue el dinero, porque ese dato no existe en ninguna parte. La app no se lo inventa.',
   },
   {
     tema: 'El día a día',
@@ -116,13 +122,13 @@ export const AYUDA: Pregunta[] = [
     tema: 'Patrimonio y deudas',
     pregunta: '¿Por qué mi patrimonio sale negativo?',
     respuesta:
-      'Porque es la realidad. Tu Excel sumaba cuentas y fondos y llamaba a eso "VALOR NETO TOTAL", pero no restaba ni una deuda: decía +45.283 € cuando la hipoteca sola son 83.738 €. Oikos resta las deudas, y con las tuyas (hipoteca, pignoración y Firefish) el neto queda en unos −46.670 €. El número duele, pero es el bueno: el otro te estaba dando la parte buena y callando la mala.',
+      'Porque es la realidad: debes más de lo que tienes. Durante años llevaste el patrimonio en una hoja de cálculo que sumaba cuentas y fondos y llamaba a eso "VALOR NETO TOTAL", pero no restaba ninguna deuda, así que daba un número mucho más alto y más agradable que el real. Oikos sí las resta, y por eso el neto baja (y puede quedar en negativo, que es lo correcto). Si ves un neto que no cuadra con lo que tú sabes, mira dos cosas: que las deudas estén apuntadas con el saldo al día, y que la última foto del patrimonio incluya todas tus cuentas.',
   },
   {
     tema: 'Patrimonio y deudas',
-    pregunta: '¿De dónde salen las cuatro deudas que vienen cargadas?',
+    pregunta: '¿De dónde salen las deudas que aparecen al cargar mi copia?',
     respuesta:
-      'De tu documento «Plan de libertad financiera 2026-2036», del 30 de septiembre de 2026: hipoteca de ING 83.738,84 €, préstamo solidario de Bankinter 12.969 €, pignoración de MyInvestor 7.184,29 € y Firefish 1.030 €. Compruébalas en Patrimonio → Revisar las deudas: si el saldo ha cambiado, el neto cambia con él. El préstamo solidario está marcado como compartido (lo paga ella), así que se enseña aparte y no se resta.',
+      'De tu archivo de copia: ahí viajan tus deudas con el saldo que tenían el día que se anotó. Por eso no aparecen hasta que importas la copia, y por eso conviene revisarlas de vez en cuando. Se cambian en Patrimonio → Revisar las deudas, y al corregir un saldo el neto cambia con él. Las que están marcadas como compartidas (las que paga otra persona, pero cuyo riesgo es tuyo) se enseñan aparte y no se restan del neto.',
   },
   {
     tema: 'Patrimonio y deudas',
@@ -140,7 +146,7 @@ export const AYUDA: Pregunta[] = [
     tema: 'Patrimonio y deudas',
     pregunta: '¿Qué es el Bitcoin que sale en el patrimonio?',
     respuesta:
-      'Es la cuenta Bitcoin de tu Excel, valorada a precio de mercado en cada foto. Además hay una tarjeta con las 89 compras de la hoja «Bitcoin 2025» (0,11623313 BTC, 9.890,04 €) y su precio medio de compra. Ojo: esas compras son solo de octubre a diciembre de 2025; tu plan declara 0,19426538 BTC, así que hay compras anteriores que no están en esa hoja. El total bueno es el de la cuenta en la última foto.',
+      'Es una cuenta más de tu patrimonio: se valora a precio de mercado en cada foto del mes, así que su valor sube y baja con el precio. Además, si tu copia trae las compras una a una, hay una tarjeta con el total comprado, lo invertido y el precio medio de entrada, que es el dato que de verdad interesa cuando el precio se mueve. Ojo con una cosa: las compras que traiga tu archivo pueden no ser todas (si has comprado en otro sitio o en otras fechas, faltarán), y por eso el total que cuenta para el patrimonio es el que tú pongas en la cuenta Bitcoin al hacer la foto del mes.',
   },
   {
     tema: 'Tus datos',
@@ -188,7 +194,7 @@ export const AYUDA: Pregunta[] = [
     tema: 'Si algo va mal',
     pregunta: 'Quiero volver a empezar de cero',
     respuesta:
-      'En Ajustes → Tus datos hay dos botones. «Recargar el histórico del Excel» deja la app tal y como estaba el primer día. «Borrar todos los datos» la deja vacía del todo. Los dos piden confirmación. Antes de usar cualquiera, guarda una copia.',
+      'En Ajustes → Tus datos hay dos botones. «Volver a los datos de partida» deja la app con las categorías y las cuentas genéricas de fábrica, sin nada tuyo. «Borrar todos los datos» la deja vacía del todo. Los dos piden confirmación y los dos borran lo que hayas apuntado o importado, así que guarda antes una copia.',
   },
 ]
 

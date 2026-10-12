@@ -3,13 +3,19 @@
  *
  * `smoke.mjs` comprueba que la app abre, apunta un gasto y lo enseña. Aquí se prueban los
  * caminos que se recorren de vez en cuando y que, por eso mismo, nadie prueba: crear el primer
- * presupuesto, hacer la foto del patrimonio, renombrar una categoría, borrar un movimiento y
- * dar una vuelta completa a la copia de seguridad.
+ * presupuesto, hacer la foto del patrimonio, renombrar una categoría, borrar un movimiento,
+ * apuntar y corregir deudas y dar una vuelta completa a la copia de seguridad.
  *
  * Merece la pena tenerlos porque son justo donde aparecen los fallos que no se ven: la pantalla
  * de Presupuestos, por ejemplo, era INALCANZABLE con la app recién instalada (solo se llegaba
  * desde una tarjeta de Inicio que aparece cuando ya tienes un presupuesto). Ese fallo lo
  * encontró el intento de escribir esta prueba.
+ *
+ * IMPORTANTE: esta prueba NO lee ningún fichero de datos ni da por hecho ningún dato personal.
+ * La app arranca vacía a propósito (el repositorio es público) y **todo lo que se comprueba aquí
+ * lo crea la propia prueba a través de la interfaz**: un presupuesto de 50 €, un gasto de 100 €,
+ * la foto del patrimonio, una deuda inventada y los movimientos que luego borra. Toda cifra que
+ * se compara sale de lo que la prueba acaba de escribir.
  *
  * Uso:
  *   npm run build
@@ -29,6 +35,33 @@ const RAIZ = join(AQUI, '..')
 const DIST = join(RAIZ, 'dist')
 const CAPTURAS = join(RAIZ, 'capturas')
 const MOVIL = { width: 412, height: 915 }
+
+// ---------------------------------------------------------------------------
+// Datos que INVENTA esta prueba. Ninguno viene de nadie: son los que ella misma
+// apunta por la interfaz y luego comprueba. Lo único que se reutiliza del código
+// de la app son los nombres genéricos de sus cuentas ("Cuenta corriente",
+// "Efectivo"), que sí están en el repositorio.
+// ---------------------------------------------------------------------------
+
+const CATEGORIA = 'Alimentación'
+const CATEGORIA_RENOMBRADA = 'Alimentación y casa'
+const TOPE_ALIMENTACION = '50'
+const GASTO_GRANDE = 'Compra grande del mes'
+const GASTO_GRANDE_IMPORTE = '100'
+const MOV_QUE_SE_BORRA = 'Movimiento que se borra'
+const MOV_POSTERIOR_A_LA_COPIA = 'Esto lo quita la copia'
+
+/** La foto del patrimonio que hace la prueba con las cuentas genéricas de la app. */
+const FOTO_CORRIENTE = '2000'
+const FOTO_EFECTIVO = '100'
+const FOTO_TOTAL = '2100,00 €'
+
+/** La deuda inventada de la prueba, y su saldo corregido. */
+const DEUDA = 'Hipoteca de prueba'
+const DEUDA_SALDO = '5000'
+const DEUDA_SALDO_CORREGIDO = '80000'
+const DEUDA_TEMPORAL = 'Deuda temporal'
+const DEUDA_TEMPORAL_SALDO = '500'
 
 async function main() {
   if (!existsSync(join(DIST, 'index.html'))) {
@@ -100,10 +133,46 @@ async function main() {
     }
   }
 
+  /**
+   * Espera a que la CIFRA GRANDE de la pantalla valga exactamente esto y devuelve si lo ha hecho.
+   *
+   * Se compara con `===` (no con "contiene") porque en estas pantallas los importes se parecen
+   * mucho entre sí: buscar "0,00 €" mientras pone "80.000,00 €" daría por bueno un resultado que
+   * no lo es. La primera `.cifra` del documento es la protagonista de la pantalla: el neto en
+   * Patrimonio, la deuda propia en Mis deudas.
+   */
+  const cifraPrincipal = async (texto, limiteMs = 5_000) => {
+    try {
+      await pagina.waitForFunction(
+        // Se comparan sin espacios: el formateador de euros mete un espacio fino entre el
+        // número y el símbolo (2100,00 €), y comparar carácter a carácter fallaría por eso.
+        (esperado) =>
+          (document.querySelector('.cifra')?.textContent ?? '').replace(/\s/g, '') ===
+          esperado.replace(/\s/g, ''),
+        texto,
+        { timeout: limiteMs },
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** El campo de concepto de Apuntar, sin depender del texto de su marcador. */
+  const campoConcepto = () =>
+    pagina.locator('.tarjeta').filter({ hasText: 'Concepto' }).getByRole('textbox').first()
+
   try {
     await pagina.goto(servidor.url, { waitUntil: 'domcontentloaded' })
     await entraEnLaApp(pagina, { destino: 'Entrar en la app' })
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 20_000 })
+
+    // La app recién instalada no lleva ni un dato de nadie, y antes no lo decía: se veían ceros
+    // por todas partes y no había forma de saber si faltaba cargar algo o si estaba rota.
+    comprueba.comprueba(
+      await aparece('Está vacía porque no lleva tus datos dentro'),
+      'Con la app recién instalada, Inicio avisa de que está vacía y de dónde se cargan los datos',
+    )
 
     // =====================================================================
     // 1. Crear el PRIMER presupuesto con la app recién instalada
@@ -120,7 +189,7 @@ async function main() {
     // Se busca por la ETIQUETA y no por el `id`: los `id` llevan un numero para ser seguros en
     // CSS, y la etiqueta es lo que ve una persona (y lo que un lector de pantalla lee).
     const topeAlimentacion = pagina.getByLabel(/^Alimentación/)
-    await topeAlimentacion.fill('50')
+    await topeAlimentacion.fill(TOPE_ALIMENTACION)
     await topeAlimentacion.blur()
     await pagina.waitForTimeout(500)
 
@@ -131,7 +200,7 @@ async function main() {
     await pagina.getByRole('button', { name: /Presupuestos y avisos/ }).click()
     await pagina.getByText('Topes por categoría').waitFor({ timeout: 10_000 })
     comprueba.comprueba(
-      (await pagina.getByLabel(/^Alimentación/).inputValue()) === '50',
+      (await pagina.getByLabel(/^Alimentación/).inputValue()) === TOPE_ALIMENTACION,
       'El tope se guarda de verdad (sigue ahí al salir y volver)',
     )
 
@@ -139,12 +208,13 @@ async function main() {
     // 2. Que el aviso salga en Inicio cuando te pasas
     // =====================================================================
     await pagina.getByRole('button', { name: 'Apuntar', exact: true }).click()
-    await teclea('100')
+    await teclea(GASTO_GRANDE_IMPORTE)
     await pagina.getByRole('button', { name: 'Alimentación', exact: false }).first().click()
-    await pagina.getByPlaceholder('Mercadona, gasolina, cuota…').fill('Compra grande del mes')
+    await campoConcepto().fill(GASTO_GRANDE)
     await pagina.getByRole('button', { name: 'Apuntar 100,00 €' }).click()
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 15_000 })
 
+    // Los 100 € del tope de 50 € los ha apuntado la prueba: el aviso sale de SUS cifras.
     const textoInicio = await pagina.locator('body').innerText()
     comprueba.comprueba(
       textoInicio.toUpperCase().includes('PRESUPUESTOS QUE VIGILAR'),
@@ -164,30 +234,49 @@ async function main() {
     await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
     const netoAntes = await pagina.locator('.cifra').first().innerText()
 
-    await pagina.getByRole('button', { name: /Hacer la foto de hoy/ }).click()
-    await pagina.getByText('Foto del patrimonio').waitFor({ timeout: 10_000 })
-    const campoNomina = pagina.getByLabel('Cuenta nómina (ING)')
-    const precargado = await campoNomina.inputValue()
-    comprueba.comprueba(
-      precargado === '1190,4',
-      `La foto viene rellenada con lo que valían las cuentas la última vez (${precargado})`,
-    )
-    await captura('02-foto-patrimonio')
+    const abrirFoto = async () => {
+      await pagina.getByRole('button', { name: /Hacer la foto de hoy/ }).click()
+      await pagina.getByText('Foto del patrimonio').waitFor({ timeout: 10_000 })
+    }
 
-    await campoNomina.fill('2000')
+    await abrirFoto()
+    const campoCorriente = pagina.getByLabel('Cuenta corriente')
+    const campoEfectivo = pagina.getByLabel('Efectivo')
+    // La app arranca sin ninguna foto, así que la primera vez no hay nada que precargar.
+    const vaciaAlEmpezar =
+      (await campoCorriente.inputValue()) === '' && (await campoEfectivo.inputValue()) === ''
+
+    await campoCorriente.fill(FOTO_CORRIENTE)
+    await campoEfectivo.fill(FOTO_EFECTIVO)
+    await captura('02-foto-patrimonio')
     await pagina.getByRole('button', { name: 'Guardar la foto' }).click()
     await pagina.getByText('Fotos guardadas').waitFor({ timeout: 10_000 })
 
-    const textoPatrimonio = await pagina.locator('body').innerText()
-    comprueba.comprueba(textoPatrimonio.includes('2000,00'), 'La cuenta nueva sale con el valor corregido')
-    comprueba.comprueba(textoPatrimonio.includes('37 fotos'), 'La foto se añade a las 36 del Excel')
+    // Y la segunda vez sí tiene que venir rellenada con lo que valían las cuentas la última vez:
+    // es lo que hace que la foto mensual sea corregir dos números y no teclearlos todos.
+    await abrirFoto()
+    const precargada = await pagina.getByLabel('Cuenta corriente').inputValue()
+    await pagina.getByRole('button', { name: 'Cancelar', exact: true }).click()
     comprueba.comprueba(
-      textoPatrimonio.includes('apuntada a mano'),
-      'Se distingue de las que vinieron del Excel',
+      vaciaAlEmpezar && precargada === FOTO_CORRIENTE,
+      `La foto viene vacía la primera vez (${vaciaAlEmpezar ? 'sí' : 'NO'}) y al repetirla con lo último guardado (${precargada})`,
+    )
+
+    comprueba.comprueba(
+      (await aparece(`${FOTO_CORRIENTE},00`)) && (await aparece(`${FOTO_EFECTIVO},00`)),
+      `La cuenta nueva sale con el valor que ha tecleado la prueba (${FOTO_CORRIENTE} € y ${FOTO_EFECTIVO} €)`,
     )
     comprueba.comprueba(
-      (await pagina.locator('.cifra').first().innerText()) !== netoAntes,
-      'El patrimonio neto se recalcula con la foto nueva',
+      await aparece('1 fotos'),
+      'La foto se añade a las que había: ahora hay 1 (antes esta comprobación contaba las 36 del Excel)',
+    )
+    comprueba.comprueba(
+      await aparece('apuntada a mano'),
+      'Se distingue de las que vinieran de una copia importada',
+    )
+    comprueba.comprueba(
+      await cifraPrincipal(FOTO_TOTAL),
+      `El patrimonio neto se recalcula con la foto nueva (${FOTO_TOTAL})`,
     )
 
     // =====================================================================
@@ -197,45 +286,74 @@ async function main() {
     await pagina.getByText('Copia de seguridad', { exact: true }).waitFor({ timeout: 10_000 })
     await pagina.locator('summary').filter({ hasText: 'Categorías' }).click()
 
-    const campoDeporte = pagina.getByLabel('Nombre de la categoría Deporte')
-    await campoDeporte.waitFor({ timeout: 10_000 })
-    await campoDeporte.fill('Deporte y bici')
-    await campoDeporte.blur()
+    const campoCategoria = pagina.getByLabel(`Nombre de la categoría ${CATEGORIA}`)
+    await campoCategoria.waitFor({ timeout: 10_000 })
+    await campoCategoria.fill(CATEGORIA_RENOMBRADA)
+    await campoCategoria.blur()
     await pagina.waitForTimeout(600)
 
+    // Antes se buscaba un movimiento del histórico real. Ahora se busca el gasto que ha
+    // apuntado esta misma prueba, que es el que usa esa categoría.
     await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
+    await pagina.getByText('Gastado este mes').waitFor({ timeout: 10_000 })
     await pagina.getByRole('button', { name: 'Ver todos' }).click()
-    await pagina.getByPlaceholder('Buscar por concepto o categoría').fill('Decathlon')
-    await pagina.waitForTimeout(500)
+    const buscador = pagina.getByPlaceholder('Buscar por concepto o categoría')
+    await buscador.waitFor({ timeout: 10_000 })
+    await buscador.fill(GASTO_GRANDE)
     comprueba.comprueba(
-      (await pagina.locator('body').innerText()).includes('Deporte y bici'),
+      await aparece(CATEGORIA_RENOMBRADA),
       'Renombrar una categoría arrastra los movimientos que la usaban',
     )
 
     // =====================================================================
     // 5. Borrar un movimiento (pide confirmación)
     // =====================================================================
-    const buscador = pagina.getByPlaceholder('Buscar por concepto o categoría')
-    await buscador.fill('Bonarea')
-    await pagina.waitForTimeout(400)
-    await pagina.getByText('Bonarea', { exact: true }).first().click()
+    // El movimiento que se borra lo apunta la prueba aquí mismo: antes se borraba uno del
+    // histórico de Óscar, y eso ya no existe (ni debe existir) dentro del repositorio.
+    await pagina.getByRole('button', { name: 'Apuntar', exact: true }).click()
+    await pagina.getByRole('button', { name: 'Apuntar 0,00 €' }).waitFor({ timeout: 10_000 })
+    await teclea('7')
+    await pagina.getByRole('button', { name: 'Ocio', exact: false }).first().click()
+    await campoConcepto().fill(MOV_QUE_SE_BORRA)
+    await pagina.getByRole('button', { name: 'Apuntar 7,00 €' }).click()
+    await pagina.getByText('Gastado este mes').waitFor({ timeout: 15_000 })
+
+    await pagina.getByRole('button', { name: 'Ver todos' }).click()
+    const buscadorBorrado = pagina.getByPlaceholder('Buscar por concepto o categoría')
+    await buscadorBorrado.waitFor({ timeout: 10_000 })
+    await buscadorBorrado.fill(MOV_QUE_SE_BORRA)
+    await pagina.getByText(MOV_QUE_SE_BORRA, { exact: true }).first().click()
     await pagina.getByRole('button', { name: 'Borrar movimiento' }).waitFor({ timeout: 10_000 })
     await pagina.getByRole('button', { name: 'Borrar movimiento' }).click()
-    await pagina.getByText('Confirmar borrado').waitFor({ timeout: 5_000 })
-    comprueba.comprueba(true, 'Borrar un movimiento pide confirmación antes de tocar nada')
+    comprueba.comprueba(
+      await aparece('Confirmar borrado'),
+      'Borrar un movimiento pide confirmación antes de tocar nada',
+    )
 
     await pagina.getByRole('button', { name: 'Confirmar borrado' }).click()
-    await pagina.getByPlaceholder('Buscar por concepto o categoría').waitFor({ timeout: 10_000 })
-    await pagina.getByPlaceholder('Buscar por concepto o categoría').fill('Bonarea')
-    await pagina.waitForTimeout(500)
+    const buscadorTrasBorrar = pagina.getByPlaceholder('Buscar por concepto o categoría')
+    await buscadorTrasBorrar.waitFor({ timeout: 10_000 })
+    await buscadorTrasBorrar.fill(MOV_QUE_SE_BORRA)
     comprueba.comprueba(
-      (await pagina.locator('body').innerText()).includes('No hay movimientos con esos filtros'),
+      await aparece('No hay movimientos con esos filtros'),
       'El movimiento borrado ya no está',
     )
 
     // =====================================================================
     // 6. La copia de seguridad: ida y vuelta
     // =====================================================================
+    // Antes de hacer la copia, la prueba apunta su propia deuda: así la copia lleva algo de
+    // verdad que comprobar, en lugar de dar por hecho que existía la hipoteca de nadie.
+    await pagina.getByRole('button', { name: 'Patrimonio', exact: true }).click()
+    await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
+    await pagina.getByRole('button', { name: 'Añadir mis deudas' }).click()
+    await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })
+    await pagina.getByRole('button', { name: '+ Añadir una deuda' }).click()
+    await pagina.getByLabel('Nombre').fill(DEUDA)
+    await pagina.getByLabel('Capital pendiente').fill(DEUDA_SALDO)
+    await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
+    await pagina.getByText(DEUDA, { exact: true }).waitFor({ timeout: 10_000 })
+
     await pagina.getByRole('button', { name: 'Ajustes', exact: true }).click()
     await pagina.getByText('Copia de seguridad', { exact: true }).waitFor({ timeout: 10_000 })
 
@@ -248,18 +366,25 @@ async function main() {
     const movimientosEnLaCopia = copia.movimientos.length
     const fotosEnLaCopia = copia.fotos.length
 
-    comprueba.comprueba(fotosEnLaCopia === 37, `La copia incluye la foto recién hecha (${fotosEnLaCopia} fotos)`)
     comprueba.comprueba(
-      copia.presupuestos.length === 1 && copia.presupuestos[0].categoria === 'Alimentación',
-      'La copia incluye el presupuesto creado',
+      fotosEnLaCopia === 1,
+      `La copia incluye la foto que ha hecho la prueba (${fotosEnLaCopia} foto)`,
     )
-    comprueba.comprueba(copia.deudas.length === 4, 'La copia incluye las deudas')
+    comprueba.comprueba(
+      copia.presupuestos.length === 1 && copia.presupuestos[0].categoria === CATEGORIA_RENOMBRADA,
+      'La copia incluye el presupuesto creado, ya con la categoría renombrada',
+    )
+    comprueba.comprueba(
+      copia.deudas.length === 1 && copia.deudas[0].nombre === DEUDA,
+      `La copia incluye la deuda que ha creado la prueba (${copia.deudas.length})`,
+    )
 
     // Se apunta algo DESPUÉS de la copia, para comprobar que "reemplazar" lo quita.
     await pagina.getByRole('button', { name: 'Apuntar', exact: true }).click()
+    await pagina.getByRole('button', { name: 'Apuntar 0,00 €' }).waitFor({ timeout: 10_000 })
     await teclea('7')
     await pagina.getByRole('button', { name: 'Ocio', exact: false }).first().click()
-    await pagina.getByPlaceholder('Mercadona, gasolina, cuota…').fill('Esto lo quita la copia')
+    await campoConcepto().fill(MOV_POSTERIOR_A_LA_COPIA)
     await pagina.getByRole('button', { name: 'Apuntar 7,00 €' }).click()
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 15_000 })
 
@@ -273,7 +398,7 @@ async function main() {
     await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 15_000 })
     comprueba.comprueba(
-      !(await pagina.locator('body').innerText()).includes('Esto lo quita la copia'),
+      !(await pagina.locator('body').innerText()).includes(MOV_POSTERIOR_A_LA_COPIA),
       '"Reemplazar" deja la app exactamente como la copia',
     )
 
@@ -302,8 +427,10 @@ async function main() {
     )
 
     // =====================================================================
-    // 7. Las deudas: son lo que corrige el fallo del Excel, así que se prueban
+    // 7. Las deudas: se apuntan, se corrigen y se borran
     // =====================================================================
+    // Las deudas del plan financiero de Óscar eran un dato suyo y ya no viajan en el código.
+    // La prueba se crea la suya (arriba) y aquí comprueba que los totales salen de SUS cifras.
     await pagina.getByRole('button', { name: 'Patrimonio', exact: true }).click()
     await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
     const netoAntesDeLasDeudas = await pagina.locator('.cifra').first().innerText()
@@ -311,44 +438,50 @@ async function main() {
     await pagina.getByRole('button', { name: 'Revisar las deudas' }).click()
     await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })
     comprueba.comprueba(
-      (await pagina.locator('body').innerText()).includes('91.953,13'),
-      'La deuda propia suma hipoteca + pignoración + Firefish (91.953,13 €)',
+      await cifraPrincipal('5000,00 €'),
+      'La deuda propia es la que ha apuntado la prueba (5000,00 €)',
     )
 
-    // --- Editar el saldo de la hipoteca ---
-    const tarjetaHipoteca = pagina.locator('.tarjeta').filter({ hasText: 'Hipoteca (ING)' })
-    await tarjetaHipoteca.getByRole('button', { name: 'Editar' }).click()
+    // --- Editar el saldo de la deuda ---
+    const tarjetaDeuda = pagina.locator('.tarjeta').filter({ hasText: DEUDA })
+    await tarjetaDeuda.getByRole('button', { name: 'Editar' }).click()
     const campoSaldo = pagina.getByLabel('Capital pendiente')
     await campoSaldo.waitFor({ timeout: 10_000 })
     comprueba.comprueba(
-      (await campoSaldo.inputValue()).replace('.', ',') === '83738,84',
+      (await campoSaldo.inputValue()).replace('.', ',') === DEUDA_SALDO,
       'El formulario viene con el saldo que había',
     )
-    await campoSaldo.fill('80000')
+    await campoSaldo.fill(DEUDA_SALDO_CORREGIDO)
     await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
     comprueba.comprueba(
-      await aparece('88.214,29'),
-      'Al corregir el saldo de la hipoteca, el total de deuda se recalcula',
+      await cifraPrincipal('80.000,00 €'),
+      'Al corregir el saldo de la deuda, el total se recalcula',
     )
 
     // --- Marcar una deuda como pagada ---
-    const tarjetaFirefish = pagina.locator('.tarjeta').filter({ hasText: 'Firefish' })
-    await tarjetaFirefish.getByRole('button', { name: 'Marcar como pagada' }).click()
-    comprueba.comprueba(await aparece('87.184,29'), 'Una deuda pagada deja de contar en el total')
+    const tarjetaDeudaPagada = pagina.locator('.tarjeta').filter({ hasText: DEUDA })
+    await tarjetaDeudaPagada.getByRole('button', { name: 'Marcar como pagada' }).click()
+    comprueba.comprueba(
+      await cifraPrincipal('0,00 €'),
+      'Una deuda pagada deja de contar en el total',
+    )
 
     // --- Añadir una deuda y borrarla ---
     await pagina.getByRole('button', { name: '+ Añadir una deuda' }).click()
-    await pagina.getByLabel('Nombre').fill('Deuda de prueba')
-    await pagina.getByLabel('Capital pendiente').fill('500')
+    await pagina.getByLabel('Nombre').fill(DEUDA_TEMPORAL)
+    await pagina.getByLabel('Capital pendiente').fill(DEUDA_TEMPORAL_SALDO)
     await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
-    comprueba.comprueba(await aparece('87.684,29'), 'Una deuda nueva entra en el total')
+    comprueba.comprueba(
+      await cifraPrincipal('500,00 €'),
+      'Una deuda nueva entra en el total',
+    )
 
-    const tarjetaPrueba = pagina.locator('.tarjeta').filter({ hasText: 'Deuda de prueba' })
-    await tarjetaPrueba.getByRole('button', { name: 'Editar' }).click()
+    const tarjetaTemporal = pagina.locator('.tarjeta').filter({ hasText: DEUDA_TEMPORAL })
+    await tarjetaTemporal.getByRole('button', { name: 'Editar' }).click()
     await pagina.getByRole('button', { name: 'Borrar', exact: true }).click()
     await pagina.getByRole('button', { name: 'Confirmar borrado' }).click()
     comprueba.comprueba(
-      await desaparece('Deuda de prueba'),
+      await desaparece(DEUDA_TEMPORAL),
       'Borrar una deuda pide confirmación y la quita',
     )
 
@@ -356,7 +489,7 @@ async function main() {
     await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
     comprueba.comprueba(
       (await pagina.locator('.cifra').first().innerText()) !== netoAntesDeLasDeudas,
-      'El patrimonio neto cambia al corregir las deudas (es lo que el Excel no hacía)',
+      'El patrimonio neto cambia al corregir las deudas',
     )
 
     // =====================================================================
@@ -400,7 +533,7 @@ async function main() {
     await pagina.getByText('Copia de seguridad', { exact: true }).waitFor({ timeout: 10_000 })
 
     // --- Los objetivos se guardan al salir del campo ---
-    const objetivoInversion = pagina.getByLabel('Inversión mensual (MSCI World)')
+    const objetivoInversion = pagina.getByLabel(/Inversión mensual/)
     await objetivoInversion.fill('250')
     await objetivoInversion.blur()
     await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
@@ -410,23 +543,28 @@ async function main() {
       'El objetivo de inversión se guarda solo al salir del campo y sale en Inicio',
     )
 
-    // --- Recargar el histórico del Excel ---
+    // --- Volver a los datos de partida (antes: "recargar el histórico del Excel") ---
     await pagina.getByRole('button', { name: 'Ajustes', exact: true }).click()
-    await pagina.getByRole('button', { name: 'Recargar el histórico del Excel' }).click()
+    await pagina.getByRole('button', { name: 'Volver a los datos de partida' }).click()
     await pagina.getByRole('button', { name: 'Confirmar: se borra lo que hayas apuntado' }).click()
     comprueba.comprueba(
-      await aparece('Histórico del Excel recargado'),
-      'Recargar el histórico pide confirmación antes de borrar nada',
+      await aparece('Datos de partida restaurados'),
+      'Volver a los datos de partida pide confirmación antes de borrar nada',
     )
 
     await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 10_000 })
-    comprueba.comprueba(true, 'Y no vuelve a salir la pantalla de bienvenida')
+    // Se ha llegado a Inicio (con sus pestañas), no a la pantalla de bienvenida, y la app queda
+    // vacía: 21 categorías y 6 cuentas genéricas, sin nada de la prueba.
+    comprueba.comprueba(
+      await aparece('Está vacía porque no lleva tus datos dentro'),
+      'Y no vuelve a salir la pantalla de bienvenida: la app queda vacía y lo dice en Inicio',
+    )
 
     await pagina.getByRole('button', { name: 'Ver todos' }).click()
     comprueba.comprueba(
-      await aparece('24 movimientos'),
-      'El histórico vuelve a estar como el primer día (24 movimientos)',
+      await aparece('0 movimientos'),
+      'Los datos vuelven a estar como el primer día (0 movimientos: el histórico del Excel ya no existe)',
     )
 
     // --- Borrar todos los datos ---
@@ -434,7 +572,7 @@ async function main() {
     await pagina.getByRole('button', { name: 'Borrar todos los datos' }).click()
     await pagina.getByRole('button', { name: 'Confirmar: borrar TODO' }).click()
     comprueba.comprueba(
-      await aparece('Apuntar mi primer gasto'),
+      await aparece('Empezar apuntando un gasto'),
       'Borrar todos los datos deja la app como recién instalada (vuelve la bienvenida)',
     )
 

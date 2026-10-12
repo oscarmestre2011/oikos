@@ -85,7 +85,7 @@ async function main() {
     await pagina.goto(url, { waitUntil: 'domcontentloaded' })
     let arranca = false
     try {
-      await pagina.getByRole('button', { name: '✏️ Apuntar mi primer gasto' }).waitFor({ timeout: 30_000 })
+      await pagina.getByRole('button', { name: 'Entrar en la app', exact: true }).waitFor({ timeout: 30_000 })
       arranca = true
     } catch {
       arranca = false
@@ -100,10 +100,16 @@ async function main() {
       return
     }
 
-    const bienvenida = await pagina.locator('body').innerText()
+    // Se compara en minusculas porque `innerText` devuelve el texto TAL COMO SE VE, y los
+    // titulos de las tarjetas van en mayusculas por CSS.
+    const bienvenida = (await pagina.locator('body').innerText()).toLowerCase()
     comprueba.comprueba(
-      /\d{2}/.test(bienvenida) && bienvenida.includes('patrimonio'),
-      'La bienvenida enseña el histórico cargado',
+      bienvenida.includes('vacía') || bienvenida.includes('vacia'),
+      'La bienvenida explica que la app no lleva datos personales dentro',
+    )
+    comprueba.comprueba(
+      bienvenida.includes('importar') || bienvenida.includes('cargar mi histórico'),
+      'Y dice cómo cargar los datos de uno',
     )
 
     // --- 2. Se puede apuntar y se ve el resultado ---------------------
@@ -116,7 +122,7 @@ async function main() {
       await pagina.getByRole('button', { name: tecla, exact: true }).click()
     }
     await pagina.getByRole('button', { name: 'Alimentación', exact: false }).first().click()
-    await pagina.getByPlaceholder('Mercadona, gasolina, cuota…').fill('Prueba de la app publicada')
+    await pagina.getByPlaceholder(/cuota/).fill('Prueba de la app publicada')
     await pagina.getByRole('button', { name: 'Apuntar 42,50 €' }).click()
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 15_000 })
     comprueba.comprueba(

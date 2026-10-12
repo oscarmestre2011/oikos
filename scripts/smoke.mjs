@@ -5,6 +5,13 @@
  * puede ABRIR, APUNTAR un gasto y VERLO en el resumen, que es lo que hace falta que
  * funcione. Incluye el modo sin conexion, que es la razon de ser de una PWA.
  *
+ * IMPORTANTE: esta prueba NO lee ningun fichero de datos ni da por hecho ningun dato
+ * personal. La app arranca vacia a proposito (21 categorias, 6 cuentas genericas y ninguna
+ * cifra de nadie, porque el repositorio es publico) y **todo lo que se comprueba aqui lo
+ * crea la propia prueba a traves de la interfaz**: un gasto de 12,50 EUR, otro en el mes
+ * pasado, una foto del patrimonio y una deuda. Si algun dia alguien mete un dato real en
+ * este fichero, el repositorio lo estaria publicando.
+ *
  * Uso:
  *   npm run build
  *   npm run test:smoke
@@ -26,6 +33,48 @@ const CAPTURAS = join(RAIZ, 'capturas')
 
 /** Pixel 7: la pantalla real donde se va a usar. */
 const MOVIL = { width: 412, height: 915 }
+
+// ---------------------------------------------------------------------------
+// Todo lo que comprueba esta prueba sale de aqui: son datos INVENTADOS por ella
+// misma, no de nadie. Los nombres de cuenta que se usan ("Cuenta corriente",
+// "Efectivo") son los genericos que trae la app en su codigo.
+// ---------------------------------------------------------------------------
+
+/** El gasto del mes en curso: 12,50 EUR en Alimentacion. */
+const GASTO_CONCEPTO = 'Prueba de humo'
+const GASTO_TECLAS = ['1', '2', 'Coma decimal', '5', '0']
+
+/** Un segundo gasto, este en el mes pasado, para probar el filtro por mes. */
+const GASTO_MES_PASADO = 'Gasto del mes pasado'
+
+/** La deuda que se apunta la prueba para comprobar que el patrimonio la resta. */
+const DEUDA_NOMBRE = 'Hipoteca de prueba'
+const DEUDA_SALDO = 5000
+
+/** La foto del patrimonio que hace la prueba: 2000 en la corriente y 100 en efectivo. */
+const FOTO_CORRIENTE = 2000
+const FOTO_EFECTIVO = 100
+
+// Los meses, igual que los escribe la app (src/lib/fechas.ts), para poder buscar por mes
+// sin copiar ningun dato: el mes de hoy y el anterior los calcula la propia prueba.
+const MESES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+]
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+const HOY = new Date()
+const PRIMER_DIA_MES_PASADO = (() => {
+  const anterior = new Date(HOY.getFullYear(), HOY.getMonth() - 1, 1)
+  return `${anterior.getFullYear()}-${String(anterior.getMonth() + 1).padStart(2, '0')}-01`
+})()
+/** "septiembre de 2026": el nombre del mes pasado tal y como lo enseña la app. */
+const NOMBRE_MES_PASADO = (() => {
+  const anterior = new Date(HOY.getFullYear(), HOY.getMonth() - 1, 1)
+  return `${MESES[anterior.getMonth()]} de ${anterior.getFullYear()}`
+})()
+/** "oct 26": el mes de hoy en corto, como lo escribe la app. */
+const MES_ACTUAL_CORTO = `${MESES_CORTOS[HOY.getMonth()]} ${String(HOY.getFullYear()).slice(2)}`
 
 async function main() {
   if (!existsSync(join(DIST, 'index.html'))) {
@@ -70,16 +119,39 @@ async function main() {
     await pagina.screenshot({ path: join(CAPTURAS, `${nombre}.png`) })
   }
 
+  /**
+   * Espera a que un texto APAREZCA y devuelve si lo ha hecho.
+   *
+   * Leer el texto de la pantalla justo despues de pulsar un boton es una carrera: el dato
+   * todavia no esta pintado y la comprobacion falla sin que la app tenga nada malo. Esperar
+   * al texto bueno (con limite de tiempo) es lo que se quiere decir de verdad.
+   */
+  const aparece = async (texto, limiteMs = 5_000) => {
+    try {
+      await pagina.getByText(texto, { exact: false }).first().waitFor({ timeout: limiteMs })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** El campo de concepto de Apuntar, sin depender del texto de su marcador. */
+  const campoConcepto = () =>
+    pagina.locator('.tarjeta').filter({ hasText: 'Concepto' }).getByRole('textbox').first()
+
   try {
     // --- 1. La app abre y se presenta -----------------------------------
     await pagina.goto(servidor.url, { waitUntil: 'domcontentloaded' })
-    await pagina.getByRole('button', { name: '✏️ Apuntar mi primer gasto' }).waitFor({ timeout: 20_000 })
+    await pagina.getByRole('button', { name: 'Cargar mi histórico' }).waitFor({ timeout: 20_000 })
     comprueba.comprueba(true, 'La app abre y enseña la bienvenida la primera vez')
 
     const textoBienvenida = await pagina.locator('body').innerText()
+    // Antes esta comprobacion decia que la app venia CON el historico real dentro. Ya no:
+    // los datos personales no pueden viajar en un repositorio publico, y la bienvenida
+    // explica justo eso (que arranca vacia y por que).
     comprueba.comprueba(
-      textoBienvenida.includes('36') || textoBienvenida.includes('Fotos de patrimonio'),
-      'La bienvenida explica que el histórico del Excel ya viene cargado',
+      textoBienvenida.includes('21 categorías') && textoBienvenida.includes('6 cuentas'),
+      'La bienvenida dice que arranca con las 21 categorías y las 6 cuentas genéricas, sin ninguna cifra de nadie',
     )
     comprueba.comprueba(
       textoBienvenida.includes('sin nube') || textoBienvenida.includes('Sin cuenta'),
@@ -88,28 +160,28 @@ async function main() {
     await captura('00-bienvenida')
 
     // --- 2. Apuntar un gasto con el teclado propio ----------------------
-    await pagina.getByRole('button', { name: '✏️ Apuntar mi primer gasto' }).click()
+    await pagina.getByRole('button', { name: 'Empezar apuntando un gasto' }).click()
     await pagina.getByRole('button', { name: 'Apuntar 0,00 €' }).waitFor({ timeout: 10_000 })
     comprueba.comprueba(true, 'Se entra a la pantalla de apuntar')
 
     // 12,50 € en el teclado: 1 2 , 5 0
     // La coma y el borrar se buscan por su `aria-label`, no por el simbolo: el simbolo no
     // es un nombre accesible util para quien usa un lector de pantalla.
-    for (const tecla of ['1', '2', 'Coma decimal', '5', '0']) {
+    for (const tecla of GASTO_TECLAS) {
       await pagina.getByRole('button', { name: tecla, exact: true }).click()
     }
     const botonGuardar = pagina.getByRole('button', { name: 'Apuntar 12,50 €' })
     comprueba.comprueba(await botonGuardar.isVisible(), 'El teclado compone el importe 12,50 €')
 
     await pagina.getByRole('button', { name: 'Alimentación', exact: false }).first().click()
-    await pagina.getByPlaceholder('Mercadona, gasolina, cuota…').fill('Prueba de humo')
+    await campoConcepto().fill(GASTO_CONCEPTO)
     await captura('01-apuntar')
     await botonGuardar.click()
 
     // --- 3. El gasto aparece en Inicio ---------------------------------
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 10_000 })
     const textoInicio = await pagina.locator('body').innerText()
-    comprueba.comprueba(textoInicio.includes('Prueba de humo'), 'El gasto apuntado sale en Inicio')
+    comprueba.comprueba(textoInicio.includes(GASTO_CONCEPTO), 'El gasto apuntado sale en Inicio')
     comprueba.comprueba(textoInicio.includes('12,50'), 'El importe guardado es el que se tecleó')
     await captura('02-inicio')
 
@@ -127,35 +199,53 @@ async function main() {
       textoMesMayusculas.includes('GASTOS QUE SE REPITEN'),
       'La tarjeta de gastos repetidos está (aunque salga vacía, se explica)',
     )
+    // Antes esto miraba los meses del histórico del Excel ("mar 26", "abr 26"). Ahora dice
+    // los meses que tienen movimientos, y el único que hay es el que acaba de apuntar la prueba.
     comprueba.comprueba(
-      textoMes.includes('mar 26') && textoMes.includes('abr 26'),
-      'Dice en qué meses hay datos, para entender por qué todavía no detecta ninguno',
+      textoMes.includes('1 mes con movimientos') && textoMes.includes(MES_ACTUAL_CORTO),
+      `La tarjeta dice en qué meses hay datos (${MES_ACTUAL_CORTO}), que es el que ha apuntado la prueba`,
     )
     await captura('03-mes')
 
-    // --- 5. Los movimientos del histórico están ------------------------
+    // --- 5. El listado de movimientos: el buscador y el filtro por mes --
+    // La prueba apunta un SEGUNDO gasto, este en el mes pasado, para que el filtro por mes
+    // tenga algo que separar. Los datos del histórico del Excel ya no existen: las dos
+    // fechas que se comparan las ha creado esta misma prueba.
+    await pagina.getByRole('button', { name: 'Apuntar', exact: true }).click()
+    await pagina.getByRole('button', { name: 'Apuntar 0,00 €' }).waitFor({ timeout: 10_000 })
+    await pagina.getByRole('button', { name: '9', exact: true }).click()
+    await pagina.getByRole('button', { name: 'Ocio', exact: false }).first().click()
+    await campoConcepto().fill(GASTO_MES_PASADO)
+    await pagina.locator('input[type="date"]').fill(PRIMER_DIA_MES_PASADO)
+    await pagina.getByRole('button', { name: 'Apuntar 9,00 €' }).click()
+    await pagina.getByText('Gastado este mes').waitFor({ timeout: 15_000 })
+
     // Movimientos no es una pestaña: se entra desde El mes (o desde Inicio).
     // El texto del botón cambia en singular y en plural, así que se busca por la parte común.
+    await pagina.getByRole('button', { name: 'El mes', exact: true }).click()
+    await pagina.getByText('En qué se ha ido').waitFor({ timeout: 10_000 })
     await pagina.getByRole('button', { name: /Ver (el|los) .*movimiento/ }).click()
-    await pagina.getByPlaceholder('Buscar por concepto o categoría').waitFor({ timeout: 10_000 })
+    const buscador = pagina.getByPlaceholder('Buscar por concepto o categoría')
+    await buscador.waitFor({ timeout: 10_000 })
     comprueba.comprueba(true, 'Se entra al listado de movimientos desde El mes')
 
-    await pagina.getByPlaceholder('Buscar por concepto o categoría').fill('Prueba de humo')
-    await pagina.waitForTimeout(300)
-    const textoFiltrado = await pagina.locator('body').innerText()
+    await buscador.fill(GASTO_CONCEPTO)
     comprueba.comprueba(
-      textoFiltrado.includes('Prueba de humo'),
+      await aparece(GASTO_CONCEPTO),
       'El buscador encuentra el movimiento recién apuntado',
     )
 
-    // Y con el filtro del histórico: los movimientos de marzo de 2026 tienen que estar.
-    await pagina.getByPlaceholder('Buscar por concepto o categoría').fill('')
-    await pagina.getByRole('button', { name: 'marzo de 2026', exact: true }).click()
-    await pagina.waitForTimeout(300)
-    const textoMarzo = await pagina.locator('body').innerText()
+    // Y el filtro por mes: el gasto del mes pasado sale al elegir su mes, y el de este mes
+    // ya no está en la lista. Es la traducción de "los movimientos del CSV filtran por mes":
+    // ahora los movimientos que filtran son los que ha apuntado la prueba.
+    await buscador.fill('')
+    await pagina.getByRole('button', { name: NOMBRE_MES_PASADO, exact: true }).click()
+    const soloElDelMesPasado =
+      (await aparece(GASTO_MES_PASADO)) &&
+      !(await pagina.locator('body').innerText()).includes(GASTO_CONCEPTO)
     comprueba.comprueba(
-      textoMarzo.includes('Mercadona') || textoMarzo.includes('Decathlon'),
-      'Los movimientos del Gastos 2026.csv están cargados y filtran por mes',
+      soloElDelMesPasado,
+      `El filtro por mes separa los dos gastos de la prueba (${NOMBRE_MES_PASADO} solo trae el suyo)`,
     )
     await captura('04-movimientos')
 
@@ -179,15 +269,12 @@ async function main() {
     await pagina.getByPlaceholder('Buscar por concepto o categoría').waitFor({ timeout: 10_000 })
 
     await pagina.evaluate(() => window.history.back())
-    await pagina.waitForTimeout(600)
-    const trasAtras = await pagina.locator('body').innerText()
-    // Se compara en mayúsculas porque el título de la tarjeta va en mayúsculas por CSS y
-    // `innerText` devuelve el texto tal y como se ve.
-    const volvioAlMes = trasAtras.toUpperCase().includes('EN QUÉ SE HA IDO')
+    const volvioAlMes = await aparece('En qué se ha ido')
+    const trasAtras = volvioAlMes ? '' : (await pagina.locator('body').innerText()).replace(/\n/g, ' ').slice(0, 70)
     comprueba.comprueba(
       volvioAlMes,
       'El botón atrás vuelve a la pantalla anterior en lugar de salir de la app' +
-        (volvioAlMes ? '' : ` — se ve: «${trasAtras.slice(0, 70).replace(/\n/g, ' ')}» · url: ${pagina.url()}`),
+        (volvioAlMes ? '' : ` — se ve: «${trasAtras}» · url: ${pagina.url()}`),
     )
 
     await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
@@ -197,14 +284,41 @@ async function main() {
     // Se entra con el enlace de la tarjeta de Inicio, que es una navegación de pestaña.
     await pagina.getByRole('button', { name: 'Ver detalle' }).click()
     await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
-    const textoPatrimonio = await pagina.locator('body').innerText()
+
+    // Recién instalada no hay ni una foto ni una deuda: antes esta pantalla enseñaba la
+    // hipoteca real de Óscar y un neto negativo. Ahora el punto de partida es cero, y la app
+    // lo dice en vez de dejar creer que el patrimonio ya está completo.
+    const textoPatrimonioVacio = await pagina.locator('body').innerText()
     comprueba.comprueba(
-      textoPatrimonio.includes('-') && textoPatrimonio.includes('Deuda'),
-      'El patrimonio enseña la deuda y un neto negativo',
+      textoPatrimonioVacio.includes('Todavía no has apuntado ninguna deuda') &&
+        textoPatrimonioVacio.includes('0 fotos'),
+      'Sin datos todavía, el patrimonio está a cero y avisa de que falta apuntar las deudas',
     )
+
+    // La prueba se hace su propia foto con las cuentas genéricas de la app.
+    await pagina.getByRole('button', { name: /Hacer la foto de hoy/ }).click()
+    await pagina.getByText('Foto del patrimonio').waitFor({ timeout: 10_000 })
+    await pagina.getByLabel('Cuenta corriente').fill(String(FOTO_CORRIENTE))
+    await pagina.getByLabel('Efectivo').fill(String(FOTO_EFECTIVO))
+    await pagina.getByRole('button', { name: 'Guardar la foto' }).click()
+    await pagina.getByText('Fotos guardadas').waitFor({ timeout: 10_000 })
+
+    // Y se apunta su propia deuda (el nombre es inventado: no es la de nadie).
+    await pagina.getByRole('button', { name: 'Añadir mis deudas' }).click()
+    await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })
+    await pagina.getByRole('button', { name: '+ Añadir una deuda' }).click()
+    await pagina.getByLabel('Nombre').fill(DEUDA_NOMBRE)
+    await pagina.getByLabel('Capital pendiente').fill(String(DEUDA_SALDO))
+    await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
+    const deudaListada = await aparece(DEUDA_NOMBRE, 10_000)
+
+    await pagina.getByRole('button', { name: 'Volver', exact: true }).click()
+    await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
+    // 2000 + 100 de cuentas, menos 5000 de deuda: el neto tiene que salir negativo.
+    const netoNegativo = await aparece('-2900,00')
     comprueba.comprueba(
-      textoPatrimonio.includes('Hipoteca') || textoPatrimonio.includes('Plan de libertad financiera'),
-      'Las deudas del plan financiero están cargadas',
+      deudaListada && netoNegativo,
+      `El patrimonio resta la deuda que ha apuntado la prueba: ${FOTO_CORRIENTE + FOTO_EFECTIVO} € de cuentas menos ${DEUDA_SALDO} € dan un neto negativo`,
     )
     await captura('05-patrimonio')
 
@@ -220,9 +334,9 @@ async function main() {
     await pagina.reload({ waitUntil: 'domcontentloaded' })
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 15_000 })
     const trasRecargar = await pagina.locator('body').innerText()
-    comprueba.comprueba(trasRecargar.includes('Prueba de humo'), 'El movimiento sobrevive a recargar la página')
+    comprueba.comprueba(trasRecargar.includes(GASTO_CONCEPTO), 'El movimiento sobrevive a recargar la página')
     comprueba.comprueba(
-      !trasRecargar.includes('Apuntar mi primer gasto'),
+      !trasRecargar.includes('Empezar apuntando un gasto'),
       'La bienvenida no vuelve a salir en la segunda apertura',
     )
 
@@ -248,7 +362,7 @@ async function main() {
     if (arrancaSinConexion) {
       const sinConexion = await pagina.locator('body').innerText()
       comprueba.comprueba(
-        sinConexion.includes('Prueba de humo'),
+        sinConexion.includes(GASTO_CONCEPTO),
         'Los datos siguen ahí sin conexión (están en el móvil, no en la red)',
       )
       await captura('07-sin-conexion')
@@ -267,7 +381,8 @@ async function main() {
     // --- 11. La copia de seguridad se guarda de verdad -----------------
     // Esto no se había probado nunca de punta a punta, y es la función de la que depende que
     // no se pierdan las cuentas. No basta con que el botón exista: tiene que salir un archivo
-    // con los datos dentro.
+    // con los datos dentro. Y los datos que tienen que estar dentro son LOS DE LA PRUEBA:
+    // 2 movimientos, 1 foto y 1 deuda, los que ha creado ella misma aquí arriba.
     await pagina.getByRole('button', { name: 'Ajustes', exact: true }).click()
     await pagina.getByText('Copia de seguridad', { exact: true }).waitFor({ timeout: 10_000 })
 
@@ -283,17 +398,26 @@ async function main() {
 
     const copia = JSON.parse(readFileSync(rutaCopia, 'utf8'))
     comprueba.comprueba(copia.app === 'oikos', 'El archivo de copia se identifica como de Oikos')
-    comprueba.comprueba(copia.fotos?.length === 36, `La copia lleva las 36 fotos (${copia.fotos?.length})`)
     comprueba.comprueba(
-      copia.movimientos?.length === 25,
-      `La copia lleva los 24 movimientos del histórico más el apuntado (${copia.movimientos?.length})`,
+      copia.fotos?.length === 1 && copia.fotos[0]?.valores?.some((valor) => valor.importe === FOTO_CORRIENTE),
+      `La copia lleva la foto que ha hecho la prueba, con sus ${FOTO_CORRIENTE} € dentro (${copia.fotos?.length})`,
     )
     comprueba.comprueba(
-      copia.movimientos?.some((m) => m.concepto === 'Prueba de humo'),
+      copia.movimientos?.length === 2,
+      `La copia lleva los 2 movimientos que ha apuntado la prueba (${copia.movimientos?.length})`,
+    )
+    comprueba.comprueba(
+      copia.movimientos?.some((m) => m.concepto === GASTO_CONCEPTO),
       'La copia incluye el movimiento recién apuntado',
     )
-    comprueba.comprueba(copia.deudas?.length === 4, 'La copia lleva las deudas')
-    comprueba.comprueba(copia.bitcoin?.length === 89, 'La copia lleva las 89 compras de Bitcoin')
+    comprueba.comprueba(
+      copia.deudas?.length === 1 && copia.deudas[0]?.nombre === DEUDA_NOMBRE,
+      'La copia lleva la deuda que ha creado la prueba',
+    )
+    comprueba.comprueba(
+      copia.bitcoin?.length === 0 && copia.categorias?.length === 21,
+      `La copia no lleva ninguna compra de Bitcoin (${copia.bitcoin?.length}) y sí las 21 categorías de partida`,
+    )
 
     // --- 12. La exportación a Markdown del vault ----------------------
     const [descargaMd] = await Promise.all([
@@ -308,9 +432,9 @@ async function main() {
     )
     comprueba.comprueba(markdown.includes('tipo: finanzas'), 'El Markdown lleva el frontmatter del vault')
     comprueba.comprueba(markdown.includes('## Movimientos'), 'El Markdown lleva la tabla de movimientos')
-    comprueba.comprueba(markdown.includes('Prueba de humo'), 'El Markdown incluye el movimiento apuntado')
+    comprueba.comprueba(markdown.includes(GASTO_CONCEPTO), 'El Markdown incluye el movimiento apuntado')
     comprueba.comprueba(
-      /^\| 2026-\d\d-\d\d \|/m.test(markdown),
+      /^\| \d{4}-\d\d-\d\d \|/m.test(markdown),
       'Las fechas del Markdown van en formato YYYY-MM-DD, como en el vault',
     )
     comprueba.comprueba(
@@ -323,13 +447,17 @@ async function main() {
       pagina.getByRole('button', { name: /Markdown del patrimonio/ }).click(),
     ])
     const mdPatrimonio = readFileSync(await descargaPatrimonio.path(), 'utf8')
+    // Antes esto comprobaba que el Markdown del patrimonio llevara la hipoteca real. Ahora
+    // lleva la deuda que ha apuntado la prueba, y el neto que sale de restarla.
     comprueba.comprueba(
-      mdPatrimonio.includes('Patrimonio neto') && mdPatrimonio.includes('Hipoteca'),
-      'El Markdown del patrimonio lleva las deudas y el neto real',
+      mdPatrimonio.includes('Patrimonio neto') &&
+        mdPatrimonio.includes(DEUDA_NOMBRE) &&
+        mdPatrimonio.includes('-2900,00'),
+      'El Markdown del patrimonio lleva la deuda de la prueba y el neto real, ya restado',
     )
     comprueba.comprueba(
-      mdPatrimonio.includes('no incluyen deuda') || mdPatrimonio.includes('no registraba'),
-      'El Markdown avisa de que las fotos antiguas no incluían deuda',
+      /\| \d{4}-\d\d-\d\d \| 2100,00 \|/.test(mdPatrimonio),
+      'El Markdown del patrimonio lleva la foto que ha hecho la prueba, con sus valores',
     )
 
     // --- 13. El navegador la considera instalable ----------------------
@@ -395,7 +523,7 @@ async function compruebaInstalabilidad(comprueba, url) {
     })
     const pagina = contexto.pages()[0] ?? (await contexto.newPage())
     await pagina.goto(url, { waitUntil: 'domcontentloaded' })
-    await pagina.getByRole('button', { name: '✏️ Apuntar mi primer gasto' }).waitFor({ timeout: 20_000 })
+    await pagina.getByRole('button', { name: 'Cargar mi histórico' }).waitFor({ timeout: 20_000 })
 
     // El service worker tiene que estar activo: sin él, Chrome tampoco la da por instalable.
     const estado = await esperaServiceWorkerActivo(pagina)

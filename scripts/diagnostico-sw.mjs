@@ -47,8 +47,8 @@ async function main() {
   // Se espera a que la interfaz este dibujada: la app siembra el historico antes de pintar,
   // y el service worker se registra despues.
   try {
-    await pagina.getByRole('button', { name: '✏️ Apuntar mi primer gasto' }).waitFor({ timeout: 20_000 })
-    console.log('✅ La interfaz esta dibujada (el historico se ha sembrado).')
+    await pagina.getByRole('button', { name: 'Entrar en la app', exact: true }).waitFor({ timeout: 20_000 })
+    console.log('✅ La interfaz esta dibujada (la bienvenida sale).')
     // Se sale de la bienvenida: si no, al comprobar el modo sin conexion se buscaria la
     // pantalla de Inicio y lo que se veria seria la bienvenida, dando un falso fallo.
     await pagina.getByRole('button', { name: 'Entrar en la app', exact: true }).click()

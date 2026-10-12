@@ -2,8 +2,8 @@
  * Modelo de datos de Oikos.
  *
  * La decision mas importante de todo el modelo: **invertir y amortizar no son gasto**.
- * En el excel de partida, meter 200 EUR en el MSCI World aparecia mezclado con comprar
- * en Mercadona, y asi el resumen de "en que se me va el dinero" miente: ese dinero no se
+ * En el excel de partida, meter 200 EUR en un fondo aparecia mezclado con comprar
+ * en el supermercado, y asi el resumen de "en que se me va el dinero" miente: ese dinero no se
  * va, cambia de sitio (de la cuenta corriente al fondo, o del bolsillo al banco bajando
  * la hipoteca). Por eso hay cuatro tipos de movimiento y el resumen del mes los separa:
  *
@@ -52,7 +52,7 @@ export interface Categoria {
   ambito: TipoMovimiento
   /** Los gastos esenciales (vivienda, comida, suministros) van primero en los avisos. */
   esencial: boolean
-  /** Venia del registro real de Oscar (Gastos 2026.csv), no es una sugerencia. */
+  /** Venia del registro real de gastos de la persona (no es una sugerencia de la app). */
   historica: boolean
   activa: boolean
   orden: number
@@ -72,10 +72,10 @@ export type BloquePatrimonio = 'liquidez' | 'activo'
 /**
  * Una deuda.
  *
- * Existe como tabla propia (y no como una linea mas de la foto de patrimonio) porque el
- * excel de partida NO registraba ninguna deuda: su "VALOR NETO TOTAL" decia 45.283 EUR
- * cuando el patrimonio real era negativo. Ademas el saldo de una hipoteca cambia todos
- * los meses, asi que necesita su propia fecha de saldo.
+ * Existe como tabla propia (y no como una linea mas de la foto de patrimonio) porque el excel de
+ * partida NO registraba ninguna deuda: su "VALOR NETO TOTAL" sumaba las cuentas y los fondos sin
+ * restar lo que se debia, asi que daba un patrimonio mucho mas alto del real. Ademas el saldo de
+ * una hipoteca cambia todos los meses, asi que necesita su propia fecha de saldo.
  */
 export interface Deuda {
   id?: number
@@ -127,7 +127,7 @@ export interface Ajuste {
 }
 
 /**
- * Una compra de Bitcoin, de la hoja 'Bitcoin 2025' del excel de partida.
+ * Una compra de Bitcoin, importada de la hoja de criptomonedas de la hoja de cálculo de partida.
  *
  * Se guarda compra a compra (y no solo el total) porque permite calcular el precio medio
  * de entrada, que es el dato que de verdad se quiere saber cuando el precio se mueve.

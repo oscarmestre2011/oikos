@@ -205,7 +205,7 @@ export function Apuntar({ nav, hoy, onError }: Props) {
             className="entrada"
             type="text"
             value={concepto}
-            placeholder="Mercadona, gasolina, cuota…"
+            placeholder="Supermercado, gasolina, cuota…"
             onChange={(evento) => setConcepto(evento.target.value)}
           />
         </div>

@@ -8,9 +8,9 @@
  * tienen la app instalada seguirian con la copia vieja en caché.
  */
 
-export const VERSION = '1.0.0'
+export const VERSION = '1.1.0'
 
-export const FECHA_VERSION = '2026-10-07'
+export const FECHA_VERSION = '2026-10-12'
 
 export interface Cambio {
   tipo: 'nuevo' | 'mejorado' | 'arreglado'
@@ -26,9 +26,40 @@ export interface Nota {
 
 export const NOVEDADES: Nota[] = [
   {
-    version: '1.0.0',
+    version: '1.1.0',
     fecha: FECHA_VERSION,
-    titulo: 'Oikos nace con tu histórico dentro',
+    titulo: 'La app ya no lleva tus datos dentro (y conviene saber por qué)',
+    cambios: [
+      {
+        tipo: 'mejorado',
+        texto:
+          'Oikos se publica en internet, así que no puede llevar dentro tus saldos: quien mire el código los vería. Ahora la app trae solo las categorías y seis cuentas genéricas, y tu histórico entra importando tu archivo de copia (Ajustes → Copia de seguridad → Importar una copia). Se hace una vez.',
+      },
+      {
+        tipo: 'nuevo',
+        texto:
+          'Aviso en Inicio cuando la app está recién instalada: explica por qué está vacía y cómo cargar tus datos, para que no parezca que está rota.',
+      },
+      {
+        tipo: 'mejorado',
+        texto:
+          'Si no has apuntado ninguna deuda, Patrimonio te avisa de que el «neto» que ves es en realidad el bruto. Sin deudas, ese número engaña exactamente igual que engañaba la hoja de cálculo.',
+      },
+      {
+        tipo: 'mejorado',
+        texto: 'La pantalla de bienvenida explica que la app arranca vacía a propósito y cómo cargar los datos.',
+      },
+      {
+        tipo: 'mejorado',
+        texto:
+          'El botón «Recargar el histórico del Excel» pasa a llamarse «Volver a los datos de partida», que es lo que hace de verdad.',
+      },
+    ],
+  },
+  {
+    version: '1.0.0',
+    fecha: '2026-10-07',
+    titulo: 'Oikos nace',
     cambios: [
       {
         tipo: 'nuevo',
@@ -48,7 +79,12 @@ export const NOVEDADES: Nota[] = [
       {
         tipo: 'nuevo',
         texto:
-          'Patrimonio con las deudas de verdad: hipoteca, préstamo, pignoración y Firefish. El neto sale negativo, y por primera vez es el número real.',
+          'Patrimonio con las deudas de verdad: se apuntan con su saldo y se restan. El neto puede salir negativo, y ese es el número real.',
+      },
+      {
+        tipo: 'nuevo',
+        texto:
+          'La app arranca SIN datos personales dentro: se publica en internet, así que no puede llevar tus saldos. Tu histórico entra importando tu archivo de copia.',
       },
       {
         tipo: 'nuevo',
@@ -70,7 +106,7 @@ export const NOVEDADES: Nota[] = [
       {
         tipo: 'arreglado',
         texto:
-          'La fila de variación de tu Excel tenía las fórmulas mal referenciadas desde julio de 2026: daba +269,64 € en julio cuando fueron +3.157,80 €. La app la calcula sola, bien.',
+          'La variación del patrimonio la calcula la app restando fotos consecutivas, en vez de fiarse de una fila de fórmulas de una hoja de cálculo: así no puede descuadrar por una fórmula mal copiada.',
       },
     ],
   },

@@ -6,15 +6,7 @@
  */
 
 import { db } from './index'
-import { AJUSTES_SEMILLA, CATEGORIAS_SEMILLA, DEUDAS_SEMILLA } from '../datos/catalogo'
-import {
-  COMPRAS_BITCOIN_SEMILLA,
-  CUENTAS_SEMILLA,
-  FOTOS_SEMILLA,
-  FUENTES_SEMILLA,
-  MOVIMIENTOS_SEMILLA,
-  RESUMEN_SEMILLA,
-} from '../datos/semilla'
+import { AJUSTES_INICIALES, CATEGORIAS_INICIALES, CUENTAS_INICIALES, DEUDAS_INICIALES } from '../datos/catalogo'
 import type {
   Ajuste,
   Categoria,
@@ -26,7 +18,7 @@ import type {
   Presupuesto,
 } from '../types'
 
-/** Clave del ajuste que dice que la semilla ya se metio. */
+/** Clave del ajuste que dice que los datos de partida ya se metieron. */
 export const CLAVE_SEMILLA = 'versionSemilla'
 
 /**
@@ -66,10 +58,14 @@ function fusionaAjustes(base: Ajuste[], propios: Ajuste[]): Ajuste[] {
 }
 
 /**
- * Mete el historico real la primera vez que se abre la app.
+ * Mete los datos DE PARTIDA la primera vez que se abre la app.
  *
- * Se comprueba la marca `versionSemilla` Y que las tablas esten vacias: si alguien ha
- * borrado sus datos a proposito, la app no se los vuelve a meter por la cara.
+ * Son solo las categorias, unas cuentas genericas y los objetivos: **ningun dato personal**. El
+ * historico real de cada persona llega importando su copia (Ajustes → Importar copia), porque el
+ * repositorio de la app es publico y meterlo aqui lo publicaria.
+ *
+ * Se comprueba la marca `versionSemilla` Y que las tablas esten vacias: si alguien ha borrado
+ * sus datos a proposito, la app no se los vuelve a meter por la cara.
  */
 export async function sembrarSiHaceFalta(): Promise<boolean> {
   const marca = await db.ajustes.get(CLAVE_SEMILLA)
@@ -86,24 +82,21 @@ export async function sembrarSiHaceFalta(): Promise<boolean> {
   }
 
   await db.transaction('rw', [db.movimientos, db.categorias, db.cuentas, db.deudas, db.fotos, db.presupuestos, db.ajustes, db.bitcoin], async () => {
-    await db.categorias.bulkAdd(CATEGORIAS_SEMILLA)
-    await db.cuentas.bulkAdd(CUENTAS_SEMILLA)
-    await db.deudas.bulkAdd(DEUDAS_SEMILLA)
-    await db.fotos.bulkAdd(FOTOS_SEMILLA)
-    await db.movimientos.bulkAdd(MOVIMIENTOS_SEMILLA)
-    await db.bitcoin.bulkAdd(COMPRAS_BITCOIN_SEMILLA)
-    await db.ajustes.bulkPut(AJUSTES_SEMILLA)
+    await db.categorias.bulkAdd(CATEGORIAS_INICIALES)
+    await db.cuentas.bulkAdd(CUENTAS_INICIALES)
+    await db.deudas.bulkAdd(DEUDAS_INICIALES)
+    await db.ajustes.bulkPut([...AJUSTES_INICIALES, { clave: CLAVE_SEMILLA, valor: '1' }])
   })
   return true
 }
 
 /**
- * Vuelve a dejar la app con el historico de partida (borra lo que hubiera).
+ * Vuelve a dejar la app con los datos DE PARTIDA (borra lo que hubiera).
  *
- * Se conservan los ajustes de este equipo (`bienvenidaVista` y compañia): si no, al recargar el
- * historico la app saltaria a la pantalla de bienvenida, que es justo lo que nadie espera al
- * pulsar ese boton. Y se hace TODO en una sola transaccion: en dos pasos, la app llega a verse
- * vacia por el camino.
+ * OJO: esto borra el historico importado. Se conservan los ajustes de este equipo
+ * (`bienvenidaVista` y compañia): si no, al pulsar el boton la app saltaria a la pantalla de
+ * bienvenida. Y se hace TODO en una sola transaccion: en dos pasos, la app llega a verse vacia
+ * por el camino.
  */
 export async function reiniciarConSemilla(): Promise<void> {
   const propios = (await db.ajustes.toArray()).filter((a) => AJUSTES_DE_ESTE_EQUIPO.includes(a.clave))
@@ -119,15 +112,12 @@ export async function reiniciarConSemilla(): Promise<void> {
       db.bitcoin.clear(),
       db.ajustes.clear(),
     ])
-    await db.categorias.bulkAdd(CATEGORIAS_SEMILLA)
-    await db.cuentas.bulkAdd(CUENTAS_SEMILLA)
-    await db.deudas.bulkAdd(DEUDAS_SEMILLA)
-    await db.fotos.bulkAdd(FOTOS_SEMILLA)
-    await db.movimientos.bulkAdd(MOVIMIENTOS_SEMILLA)
-    await db.bitcoin.bulkAdd(COMPRAS_BITCOIN_SEMILLA)
+    await db.categorias.bulkAdd(CATEGORIAS_INICIALES)
+    await db.cuentas.bulkAdd(CUENTAS_INICIALES)
+    await db.deudas.bulkAdd(DEUDAS_INICIALES)
     // Los de este equipo van DESPUES para que ganen ellos (por ejemplo, cada cuanto recordar
     // la copia, que es una preferencia y no un dato).
-    await db.ajustes.bulkPut(fusionaAjustes(AJUSTES_SEMILLA, propios))
+    await db.ajustes.bulkPut(fusionaAjustes(AJUSTES_INICIALES, propios))
   })
 }
 
@@ -588,8 +578,17 @@ export async function estadisticas(): Promise<EstadisticasBase> {
   }
 }
 
-/** De donde salio el historico, para poder enseñarlo en Ajustes y en la bienvenida. */
-export const ORIGEN_HISTORICO = {
-  ...FUENTES_SEMILLA,
-  ...RESUMEN_SEMILLA,
+/**
+ * Que trae la app recien instalada, para poder explicarlo en la bienvenida y en Ajustes.
+ *
+ * Antes esto era "de donde salio el historico", porque la app venia con el historico real
+ * dentro. Ya no: el repositorio es publico y los datos personales no pueden viajar ahi. Ahora la
+ * app arranca con lo justo para funcionar y el historico se importa.
+ */
+export const DATOS_DE_PARTIDA = {
+  categorias: CATEGORIAS_INICIALES.length,
+  cuentas: CUENTAS_INICIALES.length,
+  deudas: DEUDAS_INICIALES.length,
+  /** El archivo que se importa para tener el historico dentro, generado aparte. */
+  archivoDeCopia: 'oikos-mi-historial.json',
 }

@@ -27,7 +27,7 @@ const TIPOS_POR_DEFECTO: TipoMovimiento[] = ['gasto', 'inversion', 'amortizacion
 
 /**
  * Normaliza un concepto para agrupar: minusculas, sin tildes, sin signos y con un solo
- * espacio. "Cerveza con Pere" y "cerveza  con  pere" son el mismo concepto.
+ * espacio. "Cafe con Ana" y "cafe  con  ana" son el mismo concepto.
  */
 export function normalizaConcepto(texto: string): string {
   return String(texto ?? '')

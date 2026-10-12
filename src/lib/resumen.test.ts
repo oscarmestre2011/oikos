@@ -3,8 +3,13 @@
  * comparación con la media y los presupuestos.
  *
  * La decisión central que se comprueba aquí es la del modelo: **invertir y amortizar no son
- * gasto**. Si eso se rompe, el resumen dice que Óscar se gasta 600 EUR más al mes de lo que
- * se gasta de verdad.
+ * gasto**. Si eso se rompe, el resumen infla el gasto del mes en todo lo que se aparta para
+ * inversión y amortización, que no se ha gastado: sigue siendo patrimonio.
+ *
+ * Todo lo de abajo son datos inventados: `src/datos/ejemplo.ts` para los bloques que trabajan
+ * contra varios meses de histórico, y movimientos sueltos escritos en cada prueba. Este
+ * repositorio es público, así que aquí no puede haber ni un concepto ni un importe de una
+ * persona.
  *
  * Nada depende del reloj: donde la función admite `hoy` se le pasa, y donde no, se congela
  * con `vi.setSystemTime`.
@@ -12,7 +17,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { Movimiento, Presupuesto, TipoMovimiento } from '../types'
-import { MOVIMIENTOS_SEMILLA } from '../datos/semilla'
+import { MOVIMIENTOS_EJEMPLO } from '../datos/ejemplo'
 import {
   calculaPresupuestos,
   categoriasMasUsadas,
@@ -34,7 +39,7 @@ function mov(
   tipo: TipoMovimiento,
   importe: number,
   categoria = 'Alimentación',
-  concepto = 'Concepto',
+  concepto = 'Concepto de ejemplo',
   id?: number,
 ): Movimiento {
   return { id, fecha, tipo, importe, categoria, concepto, origen: 'manual', creado: `${fecha}T12:00:00.000Z` }
@@ -93,11 +98,11 @@ describe('gastosPorCategoria', () => {
 
 describe('resumenMes con datos sintéticos', () => {
   const movimientos = [
-    mov('2026-04-01', 'ingreso', 2000, 'Ingreso', 'Nómina'),
-    mov('2026-04-02', 'gasto', 100, 'Alimentación', 'Mercadona'),
-    mov('2026-04-03', 'gasto', 50, 'Ocio', 'Cervezas'),
-    mov('2026-04-05', 'inversion', 300, 'Inversión', 'MSCI World'),
-    mov('2026-04-06', 'amortizacion', 150, 'Amortización', 'Amortización hipoteca'),
+    mov('2026-04-01', 'ingreso', 2000, 'Ingreso', 'Nómina de ejemplo'),
+    mov('2026-04-02', 'gasto', 100, 'Alimentación', 'Compra de ejemplo'),
+    mov('2026-04-03', 'gasto', 50, 'Ocio', 'Cena de ejemplo'),
+    mov('2026-04-05', 'inversion', 300, 'Inversión', 'Aportación de ejemplo'),
+    mov('2026-04-06', 'amortizacion', 150, 'Amortización', 'Amortización de ejemplo'),
     mov('2026-03-31', 'gasto', 999, 'Alimentación', 'Se cuela de marzo'),
   ]
 
@@ -167,29 +172,29 @@ describe('resumenMes con datos sintéticos', () => {
 
 describe('ordenDescendente', () => {
   it('pone delante la fecha más reciente', () => {
-    const reciente = mov('2026-09-22', 'gasto', 5)
-    const antiguo = mov('2026-09-21', 'gasto', 5)
+    const reciente = mov('2026-06-30', 'gasto', 5)
+    const antiguo = mov('2026-06-29', 'gasto', 5)
     expect(ordenDescendente(reciente, antiguo)).toBeLessThan(0)
     expect(ordenDescendente(antiguo, reciente)).toBeGreaterThan(0)
   })
 
   it('a igualdad de fecha pone delante lo apuntado después (id mayor)', () => {
-    const primero = mov('2026-09-22', 'gasto', 5, 'Ocio', 'A', 1)
-    const segundo = mov('2026-09-22', 'gasto', 5, 'Ocio', 'B', 2)
+    const primero = mov('2026-06-30', 'gasto', 5, 'Ocio', 'A', 1)
+    const segundo = mov('2026-06-30', 'gasto', 5, 'Ocio', 'B', 2)
     expect(ordenDescendente(primero, segundo)).toBeGreaterThan(0)
     expect(ordenDescendente(segundo, primero)).toBeLessThan(0)
   })
 
   it('sin id no desempata y mantiene el orden de entrada', () => {
-    expect(ordenDescendente(mov('2026-09-22', 'gasto', 5), mov('2026-09-22', 'gasto', 5))).toBe(0)
+    expect(ordenDescendente(mov('2026-06-30', 'gasto', 5), mov('2026-06-30', 'gasto', 5))).toBe(0)
   })
 
   it('el resumen lo usa de verdad: con la misma fecha, el id mayor va antes', () => {
     const movimientos = [
-      mov('2026-09-22', 'gasto', 5, 'Ocio', 'Primero', 1),
-      mov('2026-09-22', 'gasto', 5, 'Ocio', 'Segundo', 2),
+      mov('2026-06-30', 'gasto', 5, 'Ocio', 'Primero', 1),
+      mov('2026-06-30', 'gasto', 5, 'Ocio', 'Segundo', 2),
     ]
-    expect(resumenMes(movimientos, '2026-09', '2026-09-30').movimientos.map((m) => m.concepto)).toEqual([
+    expect(resumenMes(movimientos, '2026-06', '2026-06-30').movimientos.map((m) => m.concepto)).toEqual([
       'Segundo',
       'Primero',
     ])
@@ -213,11 +218,11 @@ describe('resumenesPorMes', () => {
 describe('compararConMedia', () => {
   const categoria = 'Alimentación'
   const mesesPrevios = ['2026-01-05', '2026-02-05', '2026-03-05'].map((fecha) =>
-    mov(fecha, 'gasto', 300, categoria, 'Compra'),
+    mov(fecha, 'gasto', 300, categoria, 'Compra de ejemplo'),
   )
 
   it('en un mes ya cerrado compara contra la media mensual entera', () => {
-    const movimientos = [...mesesPrevios, mov('2026-04-05', 'gasto', 250, categoria, 'Compra')]
+    const movimientos = [...mesesPrevios, mov('2026-04-05', 'gasto', 250, categoria, 'Compra de ejemplo')]
     const [alimentacion] = compararConMedia(movimientos, '2026-04', '2026-04-30')
     expect(alimentacion.media).toBe(300)
     expect(alimentacion.mediaAjustada).toBe(300)
@@ -230,7 +235,7 @@ describe('compararConMedia', () => {
     // A día 15 de un mes de 30, la media de referencia es la mitad (150). Comparar los
     // 150 EUR gastados contra los 300 de un mes entero diría que va fenomenal, y no es
     // verdad: va exactamente al ritmo de siempre.
-    const movimientos = [...mesesPrevios, mov('2026-04-05', 'gasto', 150, categoria, 'Compra')]
+    const movimientos = [...mesesPrevios, mov('2026-04-05', 'gasto', 150, categoria, 'Compra de ejemplo')]
     const [alimentacion] = compararConMedia(movimientos, '2026-04', '2026-04-15')
     expect(alimentacion.actual).toBe(150)
     expect(alimentacion.media).toBe(300)
@@ -240,7 +245,7 @@ describe('compararConMedia', () => {
   })
 
   it('el propio mes no entra en su media', () => {
-    const movimientos = [...mesesPrevios, mov('2026-04-05', 'gasto', 900, categoria, 'Compra')]
+    const movimientos = [...mesesPrevios, mov('2026-04-05', 'gasto', 900, categoria, 'Compra de ejemplo')]
     const [alimentacion] = compararConMedia(movimientos, '2026-04', '2026-04-30')
     expect(alimentacion.actual).toBe(900)
     expect(alimentacion.media).toBe(300)
@@ -248,10 +253,10 @@ describe('compararConMedia', () => {
 
   it('los meses anteriores sin gastos no cuentan ni diluyen la media', () => {
     const movimientos = [
-      mov('2026-01-05', 'gasto', 300, categoria, 'Compra'),
-      mov('2026-02-05', 'ingreso', 2000, 'Ingreso', 'Nómina'),
-      mov('2026-03-05', 'gasto', 300, categoria, 'Compra'),
-      mov('2026-04-05', 'gasto', 100, categoria, 'Compra'),
+      mov('2026-01-05', 'gasto', 300, categoria, 'Compra de ejemplo'),
+      mov('2026-02-05', 'ingreso', 2000, 'Ingreso', 'Nómina de ejemplo'),
+      mov('2026-03-05', 'gasto', 300, categoria, 'Compra de ejemplo'),
+      mov('2026-04-05', 'gasto', 100, categoria, 'Compra de ejemplo'),
     ]
     const [alimentacion] = compararConMedia(movimientos, '2026-04', '2026-04-30')
     expect(alimentacion.mesesComparados).toBe(2)
@@ -259,7 +264,7 @@ describe('compararConMedia', () => {
   })
 
   it('sin meses anteriores no hay media ni variación, pero sí el gasto real', () => {
-    const movimientos = [mov('2026-04-05', 'gasto', 100, categoria, 'Compra')]
+    const movimientos = [mov('2026-04-05', 'gasto', 100, categoria, 'Compra de ejemplo')]
     const [alimentacion] = compararConMedia(movimientos, '2026-04', '2026-04-30')
     expect(alimentacion.actual).toBe(100)
     expect(alimentacion.media).toBe(0)
@@ -269,7 +274,7 @@ describe('compararConMedia', () => {
   })
 
   it('incluye las categorías que ya no se gastan este mes, para ver que han bajado a 0', () => {
-    const movimientos = [...mesesPrevios, mov('2026-04-05', 'gasto', 100, 'Ocio', 'Cervezas')]
+    const movimientos = [...mesesPrevios, mov('2026-04-05', 'gasto', 100, 'Ocio', 'Cena de ejemplo')]
     const comparativas = compararConMedia(movimientos, '2026-04', '2026-04-30')
     const alimentacion = comparativas.find((c) => c.categoria === categoria)
     expect(alimentacion?.actual).toBe(0)
@@ -280,8 +285,8 @@ describe('compararConMedia', () => {
   it('ordena por gasto actual de mayor a menor', () => {
     const movimientos = [
       ...mesesPrevios,
-      mov('2026-04-05', 'gasto', 100, 'Ocio', 'Cervezas'),
-      mov('2026-04-06', 'gasto', 250, categoria, 'Compra'),
+      mov('2026-04-05', 'gasto', 100, 'Ocio', 'Cena de ejemplo'),
+      mov('2026-04-06', 'gasto', 250, categoria, 'Compra de ejemplo'),
     ]
     expect(compararConMedia(movimientos, '2026-04', '2026-04-30').map((c) => c.categoria)).toEqual([
       categoria,
@@ -361,33 +366,38 @@ describe('calculaPresupuestos', () => {
 
 describe('conceptosRecientes', () => {
   const movimientos = [
-    mov('2026-04-10', 'gasto', 10, 'Alimentación', 'Mercadona'),
-    mov('2026-04-08', 'gasto', 7, 'Alimentación', '  Aldi  '),
-    mov('2026-04-05', 'gasto', 12, 'Alimentación', 'mercadona'),
-    mov('2026-04-02', 'ingreso', 2000, 'Ingreso', 'Nómina'),
-    mov('2026-04-01', 'gasto', 5, 'Ocio', 'Cervezas'),
-    mov('2026-03-20', 'gasto', 7, 'Alimentación', 'Aldi'),
+    mov('2026-04-10', 'gasto', 10, 'Alimentación', 'Supermercado de ejemplo'),
+    mov('2026-04-08', 'gasto', 7, 'Alimentación', '  Compra de ejemplo  '),
+    mov('2026-04-05', 'gasto', 12, 'Alimentación', 'supermercado de ejemplo'),
+    mov('2026-04-02', 'ingreso', 2000, 'Ingreso', 'Nómina de ejemplo'),
+    mov('2026-04-01', 'gasto', 5, 'Ocio', 'Cena de ejemplo'),
+    mov('2026-03-20', 'gasto', 7, 'Alimentación', 'Compra de ejemplo'),
   ]
 
   it('devuelve los últimos conceptos usados, sin repetir y del más reciente al más antiguo', () => {
-    expect(conceptosRecientes(movimientos, 'gasto')).toEqual(['Mercadona', 'Aldi', 'Cervezas'])
+    expect(conceptosRecientes(movimientos, 'gasto')).toEqual([
+      'Supermercado de ejemplo',
+      'Compra de ejemplo',
+      'Cena de ejemplo',
+    ])
   })
 
   it('no distingue mayúsculas al deduplicar y se queda con la última grafía', () => {
-    // "mercadona" del 5 de abril no aparece porque "Mercadona" del 10 ya está en la lista.
-    expect(conceptosRecientes(movimientos, 'gasto')).not.toContain('mercadona')
+    // "supermercado de ejemplo" del 5 de abril no aparece porque "Supermercado de ejemplo" del
+    // 10 ya está en la lista.
+    expect(conceptosRecientes(movimientos, 'gasto')).not.toContain('supermercado de ejemplo')
   })
 
   it('recorta los espacios de los conceptos', () => {
-    expect(conceptosRecientes(movimientos, 'gasto')).toContain('Aldi')
+    expect(conceptosRecientes(movimientos, 'gasto')).toContain('Compra de ejemplo')
   })
 
   it('solo mira el tipo pedido', () => {
-    expect(conceptosRecientes(movimientos, 'ingreso')).toEqual(['Nómina'])
+    expect(conceptosRecientes(movimientos, 'ingreso')).toEqual(['Nómina de ejemplo'])
   })
 
   it('respeta el límite', () => {
-    expect(conceptosRecientes(movimientos, 'gasto', 2)).toEqual(['Mercadona', 'Aldi'])
+    expect(conceptosRecientes(movimientos, 'gasto', 2)).toEqual(['Supermercado de ejemplo', 'Compra de ejemplo'])
   })
 })
 
@@ -420,143 +430,149 @@ describe('gastoTotalDelMes', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Contra los datos reales del histórico de Óscar
+// Contra los cuatro meses de movimientos de ejemplo
 // ---------------------------------------------------------------------------
 
-describe('resumenMes con los movimientos reales de la semilla', () => {
+describe('resumenMes con los movimientos de ejemplo', () => {
   const hoy = '2026-04-30'
 
-  it('la semilla trae 15 gastos, 3 ingresos, 3 inversiones y 3 amortizaciones', () => {
-    // El CSV original tenía la columna Tipo inconsistente (Mintos y Bitcoin como Gasto,
-    // las amortizaciones como Inversión). La semilla ya lo normaliza; si alguien vuelve a
-    // tocar esa normalización, aquí salta.
-    const cuenta = (tipo: TipoMovimiento) => MOVIMIENTOS_SEMILLA.filter((m) => m.tipo === tipo).length
-    expect(cuenta('gasto')).toBe(15)
+  it('el ejemplo trae 12 gastos, 3 ingresos, 3 inversiones y 3 amortizaciones', () => {
+    const cuenta = (tipo: TipoMovimiento) => MOVIMIENTOS_EJEMPLO.filter((m) => m.tipo === tipo).length
+    expect(cuenta('gasto')).toBe(12)
     expect(cuenta('ingreso')).toBe(3)
     expect(cuenta('inversion')).toBe(3)
     expect(cuenta('amortizacion')).toBe(3)
-    expect(MOVIMIENTOS_SEMILLA).toHaveLength(24)
+    expect(MOVIMIENTOS_EJEMPLO).toHaveLength(21)
   })
 
-  it('marzo de 2026 cuadra con el CSV', () => {
-    const resumen = resumenMes(MOVIMIENTOS_SEMILLA, '2026-03', hoy)
-    expect(resumen.ingresos).toBe(3161.31)
-    expect(resumen.gastos).toBe(280.48)
-    expect(resumen.inversion).toBe(500)
+  it('enero cuadra: 2.000 de ingresos, 150 de gastos y 1.550 de disponible', () => {
+    const resumen = resumenMes(MOVIMIENTOS_EJEMPLO, '2026-01', hoy)
+    expect(resumen.ingresos).toBe(2000)
+    expect(resumen.gastos).toBe(150)
+    expect(resumen.inversion).toBe(200)
     expect(resumen.amortizacion).toBe(100)
-    expect(resumen.disponible).toBe(2280.83)
-    expect(resumen.tasaAhorro).toBe(18.98)
-    expect(resumen.diasConActividad).toBe(5)
-    expect(resumen.movimientos).toHaveLength(13)
+    expect(resumen.disponible).toBe(1550)
+    expect(resumen.tasaAhorro).toBe(15)
+    expect(resumen.diasConActividad).toBe(6)
+    expect(resumen.movimientos).toHaveLength(6)
   })
 
-  it('en marzo la inversión (Mintos, Bitcoin, Fondo Paula) y la amortización no son gasto', () => {
-    const resumen = resumenMes(MOVIMIENTOS_SEMILLA, '2026-03', hoy)
-    // Los 500 EUR de inversión y los 100 de amortización salieron de la cuenta corriente,
-    // pero no son gasto: siguen siendo patrimonio suyo.
-    expect(resumen.gastos).toBe(280.48)
-    expect(resumen.inversion + resumen.amortizacion).toBe(600)
-    expect(resumen.gastosPorCategoria.map((g) => g.categoria)).toEqual(['Deporte', 'Alimentación', 'Ocio'])
-  })
-
-  it('abril de 2026 cuadra con el CSV y sale en negativo (no hubo ingresos)', () => {
-    const resumen = resumenMes(MOVIMIENTOS_SEMILLA, '2026-04', '2026-05-31')
-    expect(resumen.ingresos).toBe(0)
-    expect(resumen.gastos).toBe(774.74)
-    expect(resumen.inversion).toBe(0)
-    expect(resumen.amortizacion).toBe(200)
-    expect(resumen.disponible).toBe(-974.74)
-    expect(resumen.tasaAhorro).toBe(0)
-    expect(resumen.diasConActividad).toBe(7)
-    expect(resumen.movimientos).toHaveLength(11)
+  it('la inversión y la amortización salen de la cuenta, pero no son gasto', () => {
+    // Los 300 EUR de inversión y amortización de enero salen de la cuenta corriente, pero
+    // siguen siendo patrimonio: si contaran como gasto, el resumen mentiría.
+    const resumen = resumenMes(MOVIMIENTOS_EJEMPLO, '2026-01', hoy)
+    expect(resumen.gastos).toBe(150)
+    expect(resumen.inversion + resumen.amortizacion).toBe(300)
     expect(resumen.gastosPorCategoria).toEqual([
-      { categoria: 'Hipoteca', importe: 469.15, numero: 1 },
-      { categoria: 'Alimentación', importe: 123.59, numero: 4 },
-      { categoria: 'Ocio', importe: 121, numero: 2 },
-      { categoria: 'Transporte', importe: 61, numero: 2 },
+      { categoria: 'Alimentación', importe: 100, numero: 1 },
+      { categoria: 'Suministros', importe: 40, numero: 1 },
+      { categoria: 'Suscripciones', importe: 10, numero: 1 },
     ])
   })
 
-  it('los dos meses del CSV suman los 24 movimientos de la semilla', () => {
-    const marzo = resumenMes(MOVIMIENTOS_SEMILLA, '2026-03', hoy).movimientos.length
-    const abril = resumenMes(MOVIMIENTOS_SEMILLA, '2026-04', hoy).movimientos.length
-    expect(marzo + abril).toBe(24)
+  it('el gasto medio diario de un mes ya cerrado reparte entre sus 31 días', () => {
+    expect(resumenMes(MOVIMIENTOS_EJEMPLO, '2026-01', hoy).gastoMedioDiario).toBe(4.84)
+  })
+
+  it('abril cierra en negativo porque no hubo nómina', () => {
+    const resumen = resumenMes(MOVIMIENTOS_EJEMPLO, '2026-04', '2026-05-31')
+    expect(resumen.ingresos).toBe(0)
+    expect(resumen.gastos).toBe(70)
+    expect(resumen.inversion).toBe(0)
+    expect(resumen.amortizacion).toBe(0)
+    expect(resumen.disponible).toBe(-70)
+    expect(resumen.tasaAhorro).toBe(0)
+    expect(resumen.diasConActividad).toBe(2)
+    expect(resumen.movimientos).toHaveLength(2)
+    expect(resumen.gastosPorCategoria).toEqual([
+      { categoria: 'Suministros', importe: 60, numero: 1 },
+      { categoria: 'Suscripciones', importe: 10, numero: 1 },
+    ])
+  })
+
+  it('los cuatro meses del ejemplo suman los 21 movimientos', () => {
+    const meses = ['2026-01', '2026-02', '2026-03', '2026-04']
+    const total = meses.reduce((suma, mes) => suma + resumenMes(MOVIMIENTOS_EJEMPLO, mes, hoy).movimientos.length, 0)
+    expect(total).toBe(21)
   })
 })
 
-describe('compararConMedia con los movimientos reales de la semilla', () => {
-  it('compara abril (ya cerrado) contra marzo', () => {
-    const comparativas = compararConMedia(MOVIMIENTOS_SEMILLA, '2026-04', '2026-04-30')
-    const alimentacion = comparativas.find((c) => c.categoria === 'Alimentación')
-    expect(alimentacion).toEqual({
-      categoria: 'Alimentación',
-      actual: 123.59,
-      media: 69.16,
-      mediaAjustada: 69.16,
-      mesesComparados: 1,
-      diferencia: 54.43,
-      variacion: 78.7,
+describe('compararConMedia con los movimientos de ejemplo', () => {
+  it('compara abril (ya cerrado) contra la media de enero, febrero y marzo', () => {
+    const comparativas = compararConMedia(MOVIMIENTOS_EJEMPLO, '2026-04', '2026-04-30')
+    const suministros = comparativas.find((c) => c.categoria === 'Suministros')
+    // 40 + 60 + 40 = 140 en tres meses: 46,67 de media, y en abril van 60.
+    expect(suministros).toEqual({
+      categoria: 'Suministros',
+      actual: 60,
+      media: 46.67,
+      mediaAjustada: 46.67,
+      mesesComparados: 3,
+      diferencia: 13.33,
+      variacion: 28.56,
     })
   })
 
-  it('con el mes en curso a día 15 la media se prorratea a la mitad', () => {
-    const comparativas = compararConMedia(MOVIMIENTOS_SEMILLA, '2026-04', '2026-04-15')
+  it('con el mes en curso a día 15 la media se prorratea', () => {
+    const comparativas = compararConMedia(MOVIMIENTOS_EJEMPLO, '2026-03', '2026-03-15')
     const alimentacion = comparativas.find((c) => c.categoria === 'Alimentación')
-    const ocio = comparativas.find((c) => c.categoria === 'Ocio')
-    // 15 días de 30: la mitad de la media de marzo.
-    expect(alimentacion?.mediaAjustada).toBe(34.58)
-    expect(ocio?.mediaAjustada).toBe(9)
+    const suministros = comparativas.find((c) => c.categoria === 'Suministros')
+    // 15 días de 31: la media de enero y febrero se queda en menos de la mitad.
+    expect(alimentacion?.media).toBe(110)
+    expect(alimentacion?.mediaAjustada).toBe(53.23)
+    expect(suministros?.mediaAjustada).toBe(24.19)
     // El gasto real del mes no cambia por mirarlo antes o después.
-    expect(alimentacion?.actual).toBe(123.59)
+    expect(alimentacion?.actual).toBe(80)
   })
 
-  it('marca el deporte como bajado a cero respecto a marzo', () => {
-    const comparativas = compararConMedia(MOVIMIENTOS_SEMILLA, '2026-04', '2026-04-30')
-    const deporte = comparativas.find((c) => c.categoria === 'Deporte')
-    expect(deporte?.actual).toBe(0)
-    expect(deporte?.media).toBe(193.32)
-    expect(deporte?.variacion).toBe(-100)
+  it('marca el ocio como bajado a cero respecto a los meses anteriores', () => {
+    const comparativas = compararConMedia(MOVIMIENTOS_EJEMPLO, '2026-04', '2026-04-30')
+    const ocio = comparativas.find((c) => c.categoria === 'Ocio')
+    expect(ocio?.actual).toBe(0)
+    // El cine de marzo (30) repartido entre enero, febrero y marzo: 10 de media.
+    expect(ocio?.media).toBe(10)
+    expect(ocio?.variacion).toBe(-100)
   })
 
-  it('sin meses anteriores no inventa media (marzo es el primer mes con datos)', () => {
-    const comparativas = compararConMedia(MOVIMIENTOS_SEMILLA, '2026-03', '2026-04-30')
+  it('sin meses anteriores no inventa media (enero es el primer mes con datos)', () => {
+    const comparativas = compararConMedia(MOVIMIENTOS_EJEMPLO, '2026-01', '2026-04-30')
     expect(comparativas).toHaveLength(3)
     expect(comparativas.every((c) => c.mesesComparados === 0 && c.variacion === null)).toBe(true)
   })
 
   it('ordena por gasto actual de mayor a menor', () => {
-    expect(compararConMedia(MOVIMIENTOS_SEMILLA, '2026-04', '2026-04-30').map((c) => c.categoria)).toEqual([
-      'Hipoteca',
+    expect(compararConMedia(MOVIMIENTOS_EJEMPLO, '2026-03', '2026-04-30').map((c) => c.categoria)).toEqual([
       'Alimentación',
+      'Suministros',
       'Ocio',
-      'Transporte',
-      'Deporte',
+      'Suscripciones',
     ])
   })
 })
 
-describe('categoriasMasUsadas y gastoTotalDelMes con los datos reales', () => {
-  it('las categorías más usadas del histórico real', () => {
-    expect(categoriasMasUsadas(MOVIMIENTOS_SEMILLA, 'gasto')).toEqual([
+describe('categoriasMasUsadas y gastoTotalDelMes con los movimientos de ejemplo', () => {
+  it('las categorías más usadas del ejemplo', () => {
+    // Suscripciones y Suministros empatan a cuatro movimientos: el empate lo rompe el orden en
+    // que aparecen por primera vez (la cuota es del día 5 y la luz del 20).
+    expect(categoriasMasUsadas(MOVIMIENTOS_EJEMPLO, 'gasto')).toEqual([
+      'Suscripciones',
+      'Suministros',
       'Alimentación',
       'Ocio',
-      'Deporte',
-      'Transporte',
-      'Hipoteca',
     ])
-    expect(categoriasMasUsadas(MOVIMIENTOS_SEMILLA, 'ingreso')).toEqual(['Ingreso'])
+    expect(categoriasMasUsadas(MOVIMIENTOS_EJEMPLO, 'ingreso')).toEqual(['Ingreso'])
   })
 
-  it('el gasto total de marzo y de abril', () => {
-    expect(gastoTotalDelMes(MOVIMIENTOS_SEMILLA, '2026-03')).toBe(280.48)
-    expect(gastoTotalDelMes(MOVIMIENTOS_SEMILLA, '2026-04')).toBe(774.74)
+  it('el gasto total de enero y de abril', () => {
+    expect(gastoTotalDelMes(MOVIMIENTOS_EJEMPLO, '2026-01')).toBe(150)
+    expect(gastoTotalDelMes(MOVIMIENTOS_EJEMPLO, '2026-04')).toBe(70)
   })
 
-  it('los conceptos recientes salen del CSV, del más nuevo al más viejo', () => {
-    expect(conceptosRecientes(MOVIMIENTOS_SEMILLA, 'gasto', 3)).toEqual([
-      'Aldi',
-      'Parking Port Aventura',
-      'Comida Port Aventura',
+  it('los conceptos recientes salen del ejemplo, del más nuevo al más viejo', () => {
+    expect(conceptosRecientes(MOVIMIENTOS_EJEMPLO, 'gasto', 3)).toEqual([
+      'Luz de ejemplo',
+      'Cuota de ejemplo',
+      'Cine de ejemplo',
     ])
   })
 })

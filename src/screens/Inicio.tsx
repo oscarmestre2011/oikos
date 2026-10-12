@@ -75,6 +75,31 @@ export function Inicio({ nav, hoy }: PropsPantalla) {
 
   return (
     <div>
+      {/*
+        Guía de cuando la app está recién instalada. Aparece solo si NO hay nada: ni movimientos,
+        ni fotos, ni deudas. Sin esto, alguien que abre la app por primera vez ve ceros por todas
+        partes y no sabe si está rota o es que le falta cargar sus datos.
+      */}
+      {movimientos.length === 0 && fotos.length === 0 && deudas.length === 0 && (
+        <Tarjeta titulo="Está vacía porque no lleva tus datos dentro" destacada>
+          <p className="texto-suave" style={{ marginTop: 0 }}>
+            Oikos se publica en internet y no puede llevar dentro tus saldos, tu nómina ni tu hipoteca.
+            Tu histórico entra desde un archivo tuyo, y se hace una sola vez.
+          </p>
+          <button
+            type="button"
+            className="boton boton--principal boton--ancho"
+            onClick={() => nav.irARaiz('ajustes')}
+          >
+            📥 Cargar mi histórico
+          </button>
+          <p className="texto-tenue" style={{ marginBottom: 0, marginTop: 10 }}>
+            Ajustes → Copia de seguridad → Importar una copia → «Reemplazar todo por la copia». Si
+            prefieres empezar de cero, añade tus cuentas en Ajustes y apunta el primer gasto.
+          </p>
+        </Tarjeta>
+      )}
+
       <Tarjeta destacada>
         <span className="cifra__etiqueta">{nombreMes(mes)} · día {dias} de {diasDelMes(mes)}</span>
         <Cifra valor={formateaImporte(resumen.gastos)} etiqueta="Gastado este mes" />
@@ -163,7 +188,7 @@ export function Inicio({ nav, hoy }: PropsPantalla) {
           {objetivoInversion > 0 && (
             <div className="fila-barra" style={{ padding: '4px 0 10px' }}>
               <div className="fila-barra__cabeza">
-                <span>Inversión (MSCI World)</span>
+                <span>Inversión</span>
                 <span className="fila-barra__importe">
                   {formateaImporte(resumen.inversion)} / {formateaImporte(objetivoInversion)}
                 </span>
@@ -197,7 +222,8 @@ export function Inicio({ nav, hoy }: PropsPantalla) {
             </div>
           )}
           <p className="texto-tenue" style={{ marginBottom: 0 }}>
-            Tu plan: 200 € al MSCI World y 200 € de amortización extra cada mes.
+            Tus objetivos del mes: {formateaImporte(objetivoInversion)} de inversión y{' '}
+            {formateaImporte(objetivoAmortizacion)} de amortización de deuda. Se cambian en Ajustes.
           </p>
         </Tarjeta>
       )}

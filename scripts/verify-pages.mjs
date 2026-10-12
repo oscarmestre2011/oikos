@@ -59,7 +59,7 @@ async function main() {
 
   try {
     await pagina.goto(servidor.url, { waitUntil: 'domcontentloaded' })
-    await pagina.getByRole('button', { name: '✏️ Apuntar mi primer gasto' }).waitFor({ timeout: 20_000 })
+    await pagina.getByRole('button', { name: 'Entrar en la app', exact: true }).waitFor({ timeout: 20_000 })
     comprueba.comprueba(true, `La app arranca desde ${PREFIJO} sin quedarse en blanco`)
     comprueba.comprueba(
       recursosFallidos.length === 0,

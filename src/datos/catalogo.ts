@@ -1,22 +1,27 @@
 /**
- * El catalogo inicial de Oikos: categorias, deudas y ajustes.
+ * El catalogo inicial de Oikos: categorias, cuentas de partida, deudas y ajustes.
  *
- * Esto NO se genera del excel: son decisiones escritas a mano, y por eso estan separadas
- * de `semilla.ts`. Cada dato lleva anotado de donde sale.
+ * ESTE FICHERO VA DENTRO DEL REPOSITORIO PUBLICO, asi que aqui NO puede haber ni un dato
+ * personal: ni saldos, ni movimientos, ni deudas. Las cuentas son genericas y las deudas estan
+ * vacias a proposito.
+ *
+ * El historico real de Oscar vive FUERA del repositorio, en `99 App Oikos/datos/`, y llega a la
+ * app por el archivo de copia que genera `scripts/generar-copia-personal.ts` (ver el README).
+ * Antes ese historico estaba aqui dentro, en `src/datos/semilla.ts`, y al publicar el
+ * repositorio quedaron publicos sus saldos, su nomina y su hipoteca. No vuelve a pasar.
  */
 
-import type { Ajuste, Categoria, Deuda } from '../types'
+import type { Ajuste, Categoria, Cuenta, Deuda } from '../types'
 
 /**
  * Categorias de partida.
  *
- * Las marcadas con `historica: true` son LAS TUYAS: salen tal cual del Gastos 2026.csv, con
- * el mismo nombre que les diste. Las que tienen `historica: false` son sugerencias para no
- * tener que crearlas a mano (suministros, seguros, salud...): se pueden borrar o renombrar
- * desde Ajustes sin que se rompa nada.
+ * Las de `historica: true` son las que Oscar usaba en su registro de gastos, con el mismo
+ * nombre que les dio. Las de `historica: false` son sugerencias para no tener que crearlas a
+ * mano: se pueden borrar o renombrar desde Ajustes sin que se rompa nada.
  */
-export const CATEGORIAS_SEMILLA: Categoria[] = [
-  // --- Gasto, las tuyas ---------------------------------------------------
+export const CATEGORIAS_INICIALES: Categoria[] = [
+  // --- Gasto, las suyas ---------------------------------------------------
   { nombre: 'Alimentación', ambito: 'gasto', esencial: true, historica: true, activa: true, orden: 0 },
   { nombre: 'Hipoteca', ambito: 'gasto', esencial: true, historica: true, activa: true, orden: 1 },
   { nombre: 'Transporte', ambito: 'gasto', esencial: true, historica: true, activa: true, orden: 2 },
@@ -38,8 +43,7 @@ export const CATEGORIAS_SEMILLA: Categoria[] = [
   { nombre: 'Otros', ambito: 'gasto', esencial: false, historica: false, activa: true, orden: 21 },
 
   // --- Ingreso ------------------------------------------------------------
-  // Una sola categoria, la que usabas. El detalle (nomina, SME, devoluciones) va en el
-  // concepto, que es donde ya lo tenias.
+  // Una sola categoria. El detalle (nomina, extras, devoluciones) va en el concepto.
   { nombre: 'Ingreso', ambito: 'ingreso', esencial: false, historica: true, activa: true, orden: 30 },
 
   // --- Inversion y amortizacion -------------------------------------------
@@ -49,63 +53,43 @@ export const CATEGORIAS_SEMILLA: Categoria[] = [
 ]
 
 /**
- * Las deudas, copiadas de tu `Plan de libertad financiera 2026-2036` (30-09-2026).
+ * Cuentas de partida, GENÉRICAS.
  *
- * Existen en la app porque el excel de partida NO las registraba: su "VALOR NETO TOTAL"
- * decia +45.283 EUR cuando la hipoteca sola eran 83.738 EUR. Estas cuatro cifras son las
- * que aparecen en tu propio documento; si alguna ha cambiado, se corrige en la app en dos
- * toques (Patrimonio -> Mis deudas).
+ * Son las mínimas para que la pantalla de patrimonio tenga sentido desde el primer día y para
+ * que se entienda qué se espera de ella (una cuenta corriente, una de ahorro, efectivo, y los
+ * productos de inversión típicos). Se renombran, se borran y se añaden desde Ajustes.
+ *
+ * Cuando se importa una copia en modo "reemplazar", esta lista se sustituye entera por la que
+ * traiga la copia, así que no estorba.
  */
-export const DEUDAS_SEMILLA: Deuda[] = [
-  {
-    nombre: 'Hipoteca (ING)',
-    saldo: 83738.84,
-    fechaSaldo: '2026-09-23',
-    interes: 3.67,
-    vence: '2047-04-01',
-    compartida: false,
-    notas: 'Euríbor + 1,11 % · cuota 486,66 €/mes. Dato del Plan de libertad financiera 2026-2036.',
-    activa: true,
-  },
-  {
-    nombre: 'Préstamo solidario (Bankinter)',
-    saldo: 12969.0,
-    fechaSaldo: '2026-09-23',
-    vence: '2029-03-08',
-    compartida: true,
-    notas: 'Lo paga ella, pero el riesgo es tuyo al 100 %. Por eso va marcado como compartido y se enseña aparte, sin mezclarlo con tus deudas.',
-    activa: true,
-  },
-  {
-    nombre: 'Pignoración (MyInvestor)',
-    saldo: 7184.29,
-    fechaSaldo: '2026-09-23',
-    interes: 4.5,
-    compartida: false,
-    notas: 'Tu plan dice que se cancela en octubre de 2026. Comprueba si ya está cancelada y desactívala: si no, el patrimonio sale más bajo de lo que es.',
-    activa: true,
-  },
-  {
-    nombre: 'Firefish',
-    saldo: 1030.0,
-    fechaSaldo: '2026-09-23',
-    vence: '2027-01-31',
-    compartida: false,
-    notas: 'Vence en enero de 2027. Colateral: 0,03923 BTC.',
-    activa: true,
-  },
+export const CUENTAS_INICIALES: Cuenta[] = [
+  { nombre: 'Cuenta corriente', bloque: 'liquidez', orden: 0, activa: true },
+  { nombre: 'Cuenta de ahorro', bloque: 'liquidez', orden: 1, activa: true },
+  { nombre: 'Efectivo', bloque: 'liquidez', orden: 2, activa: true },
+  { nombre: 'Fondo de inversión', bloque: 'activo', orden: 3, activa: true },
+  { nombre: 'Plan de pensiones', bloque: 'activo', orden: 4, activa: true },
+  { nombre: 'Bitcoin', bloque: 'activo', orden: 5, activa: true },
 ]
+
+/**
+ * Deudas de partida: NINGUNA.
+ *
+ * Las deudas son datos personales (cuanto debes y a quien) y viajan en la copia de cada uno, no
+ * aqui: el repositorio de la app es publico. Se deja vacio a proposito, y la pantalla de
+ * patrimonio invita a anadirlas, con sus saldos. Hasta entonces el patrimonio se ensena como
+ * "bruto", avisando de que falta restar lo que se debe.
+ */
+export const DEUDAS_INICIALES: Deuda[] = []
 
 /**
  * Ajustes de partida.
  *
- * Los objetivos de 200 + 200 EUR salen de tu plan ("lo que hago cada mes nada más cobrar"):
- * 200 EUR al MSCI World por MyInvestor y 200 EUR de amortización extra de hipoteca.
+ * Los objetivos son 200 EUR de inversion y 200 EUR de amortizacion: cifras redondas, de ejemplo,
+ * que se cambian en Ajustes en dos toques. No revelan nada de nadie.
  */
-export const AJUSTES_SEMILLA: Ajuste[] = [
+export const AJUSTES_INICIALES: Ajuste[] = [
   { clave: 'objetivoInversion', valor: '200' },
   { clave: 'objetivoAmortizacion', valor: '200' },
   { clave: 'recurrenteMinimoMeses', valor: '3' },
   { clave: 'copiaCadaDias', valor: '7' },
-  { clave: 'versionSemilla', valor: '1' },
 ]

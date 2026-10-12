@@ -156,7 +156,7 @@ export function Patrimonio({ hoy, onError }: Props) {
           <Tarjeta key={bloque.titulo} titulo={bloque.titulo}>
             {bloque.lista.map((cuenta) => {
               // El `id` se hace con el numero de cuenta y NO con su nombre: los nombres llevan
-              // espacios, tildes y parentesis ("Cuenta nomina (ING)"), y aunque un `id` asi es
+              // espacios, tildes y parentesis ("Cuenta corriente (banco)"), y aunque un `id` asi es
               // legal en HTML, cualquier selector CSS se rompe con ellos. Se descubrio al
               // escribir una prueba que intentaba localizar el campo.
               const indice = cuentasActivas.indexOf(cuenta)
@@ -350,13 +350,29 @@ export function Patrimonio({ hoy, onError }: Props) {
         )}
       </Tarjeta>
 
-      <Aviso tono="info">
-        Las cuatro deudas vienen de tu <strong>Plan de libertad financiera 2026-2036</strong> (30-09-2026).
-        Compruébalas y corrígelas: si el saldo de la hipoteca ha bajado, el neto cambia.{' '}
-        <button type="button" className="tarjeta__accion" onClick={() => setModo('deudas')}>
-          Revisar las deudas
-        </button>
-      </Aviso>
+      {/*
+        Este aviso cambia según haya deudas o no, y no es un detalle: sin deudas apuntadas, el
+        "neto" que enseña la app es en realidad el patrimonio BRUTO, o sea el mismo número
+        engañoso que daba el Excel. Hay que decirlo en vez de dejar creer que ya está todo.
+      */}
+      {deudas.filter((d) => d.activa && !d.compartida).length === 0 ? (
+        <Aviso tono="atencion">
+          <strong>Todavía no has apuntado ninguna deuda.</strong> Sin ellas, el neto que ves arriba es en
+          realidad lo que tienes, sin restar lo que debes: justo el número engañoso que daba el Excel.
+          Añade la hipoteca, los préstamos y las tarjetas, con su saldo, y el patrimonio dirá la verdad.{' '}
+          <button type="button" className="tarjeta__accion" onClick={() => setModo('deudas')}>
+            Añadir mis deudas
+          </button>
+        </Aviso>
+      ) : (
+        <Aviso tono="info">
+          Las deudas que tienes apuntadas son <strong>{deudas.filter((d) => d.activa).length}</strong>.
+          Compruébalas de vez en cuando: si el saldo de la hipoteca ha bajado, el neto cambia.{' '}
+          <button type="button" className="tarjeta__accion" onClick={() => setModo('deudas')}>
+            Revisar las deudas
+          </button>
+        </Aviso>
+      )}
 
       <Tarjeta
         titulo="Evolución"
@@ -466,9 +482,10 @@ export function Patrimonio({ hoy, onError }: Props) {
             </div>
           </div>
           <p className="texto-tenue" style={{ marginBottom: 0 }}>
-            Ojo: estas {comprasBitcoin.length} compras son solo las de la hoja «Bitcoin 2025» (0,11623313 BTC).
-            Tu plan de septiembre de 2026 declara 0,19426538 BTC, así que hay compras anteriores que no
-            están en esa hoja. El total bueno es el de la cuenta Bitcoin de la última foto.
+            Estas {comprasBitcoin.length} compras son las que vienen en tu copia, y pueden no ser todas:
+            si has comprado Bitcoin en otro sitio o en otras fechas, faltarán aquí. El total de verdad es
+            el que pongas en la cuenta Bitcoin al hacer la foto del mes, que es el que suma en el
+            patrimonio.
           </p>
         </Tarjeta>
       )}

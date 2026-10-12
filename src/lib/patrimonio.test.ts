@@ -1,21 +1,21 @@
 /**
  * Pruebas de `src/lib/patrimonio.ts`.
  *
- * Aquí está la prueba clave del proyecto: las 36 fotos del histórico real de Óscar,
- * extraídas de su Excel (`datos/historico.json`), tienen que cuadrar **exactamente** con lo
- * que calcula `totalBloque()` usando `CUENTAS_SEMILLA` y `FOTOS_SEMILLA`. Si esto falla, hay
- * una partida clasificada en el bloque equivocado o perdida por el camino, y el patrimonio
- * que enseña la app es mentira.
+ * Aquí está la prueba clave del proyecto: las fotos de patrimonio tienen que cuadrar
+ * **exactamente** con lo que calcula `totalBloque()` usando el catálogo de cuentas. Si esto
+ * falla, hay una partida clasificada en el bloque equivocado o perdida por el camino, y el
+ * patrimonio que enseña la app es mentira.
  *
- * OJO con la ruta: el JSON vive en `99 App Oikos/datos/`, fuera de la carpeta `oikos`.
+ * Se comprueba con `src/datos/ejemplo.ts`, que son datos inventados y con cifras redondas: este
+ * repositorio es público y no puede llevar ni un saldo de nadie. La comprobación de que el
+ * histórico real cuadra con su Excel vive en `scripts/generar-copia-personal.ts`, que es donde
+ * corresponde (es una propiedad de la extracción, no de la app).
  */
 
-import { existsSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import type { Cuenta, Deuda, FotoPatrimonio } from '../types'
-import { DEUDAS_SEMILLA } from '../datos/catalogo'
-import { CUENTAS_SEMILLA, FOTOS_SEMILLA } from '../datos/semilla'
+import { CUENTAS_REALES, DEUDAS_REALES, FOTOS_REALES, hayCopiaPersonal } from '../datos/ayuda-pruebas'
+import { CUENTAS_EJEMPLO, DEUDAS_EJEMPLO, FOTOS_EJEMPLO } from '../datos/ejemplo'
 import {
   calculaPatrimonio,
   seriePatrimonio,
@@ -26,51 +26,6 @@ import {
   valorEn,
   variacionEntre,
 } from './patrimonio'
-
-interface ValorExcel {
-  cuenta: string
-  importe: number
-}
-
-interface FotoExcel {
-  fecha: string
-  liquidez: ValorExcel[]
-  activos: ValorExcel[]
-  pasivos: ValorExcel[]
-  totalLiquidez: number
-  totalActivos: number
-  /** En tres fotos el extractor dejó `null` en vez de 0: ninguna de las dos cosas es deuda. */
-  totalPasivos: number | null
-  /** liquidez + activos, el "VALOR NETO TOTAL" del Excel (que no restaba deuda). */
-  total: number
-  neto: number
-}
-
-/*
- * EL HISTÓRICO NO ESTÁ EN EL REPOSITORIO, y esto se aprendió publicando.
- *
- * `datos/historico.json` son los datos personales de Óscar y se quedó fuera del repositorio a
- * propósito. Pero esta prueba lo leía nada más cargarse, así que en cualquier copia limpia
- * —incluido el flujo de GitHub Actions, que clona el repositorio— el fichero no existe, la
- * lectura revienta con ENOENT y **falla la publicación entera**. En el portátil de Óscar el
- * fichero está, así que pasaba siempre; el fallo solo aparecía al publicar, que es justo cuando
- * más caro sale.
- *
- * Ahora, si no está, la comprobación se SALTA y se dice. Sigue ejecutándose en su ordenador,
- * que es donde tiene sentido: sin el Excel no hay nada con lo que comparar.
- */
-const RUTA_HISTORICO = fileURLToPath(new URL('../../../datos/historico.json', import.meta.url))
-const hayHistorico = existsSync(RUTA_HISTORICO)
-
-interface Historico {
-  resumen: { fotosPatrimonio: number; descuadres: number; primeraFoto: string; ultimaFoto: string }
-  patrimonio: FotoExcel[]
-}
-
-const historico = hayHistorico ? (JSON.parse(readFileSync(RUTA_HISTORICO, 'utf8')) as Historico) : null
-
-/** `describe` normal si está el histórico, y saltado si no. */
-const describeConHistorico = historico ? describe : describe.skip
 
 /** Foto de patrimonio de prueba a partir de un mapa cuenta -> importe. */
 function foto(fecha: string, valores: Record<string, number>): FotoPatrimonio {
@@ -90,7 +45,7 @@ const cuentas: Cuenta[] = [
 ]
 
 describe('valorEn', () => {
-  const fotoPrueba = foto('2026-09-22', { Nómina: 100.5, Fondo: 0 })
+  const fotoPrueba = foto('2026-06-30', { Nómina: 100.5, Fondo: 0 })
 
   it('devuelve el importe de la cuenta pedida', () => {
     expect(valorEn(fotoPrueba, 'Nómina')).toBe(100.5)
@@ -102,7 +57,7 @@ describe('valorEn', () => {
   })
 
   it('devuelve undefined si la cuenta no está en la foto', () => {
-    expect(valorEn(fotoPrueba, 'Mintos')).toBeUndefined()
+    expect(valorEn(fotoPrueba, 'Una cuenta que no existe')).toBeUndefined()
   })
 
   it('devuelve undefined si no hay foto', () => {
@@ -111,7 +66,7 @@ describe('valorEn', () => {
 })
 
 describe('totalBloque', () => {
-  const fotoPrueba = foto('2026-09-22', {
+  const fotoPrueba = foto('2026-06-30', {
     Nómina: 100.1,
     Efectivo: 50.25,
     Fondo: 300,
@@ -124,14 +79,14 @@ describe('totalBloque', () => {
   })
 
   it('suma el bloque de activos aunque la cuenta esté marcada como no activa', () => {
-    // `activa` significa "la uso hoy", no "esta cuenta no cuenta": las fotos antiguas del
-    // Excel siguen trayendo ese dinero y tiene que aparecer en el total.
+    // `activa` significa "la uso hoy", no "esta cuenta no cuenta": las fotos antiguas siguen
+    // trayendo ese dinero y tiene que aparecer en el total.
     expect(totalBloque(fotoPrueba, cuentas, 'activo')).toBe(305)
   })
 
   it('ignora una cuenta que no esté en el catálogo, en vez de meterla en un bloque al azar', () => {
-    // 'Fantasma' vale 999: si se colara en el total, dejaría de cuadrar con el Excel.
-    const sinFantasma = foto('2026-09-22', { Nómina: 100.1, Efectivo: 50.25 })
+    // 'Fantasma' vale 999: si se colara en el total, los números dejarían de cuadrar.
+    const sinFantasma = foto('2026-06-30', { Nómina: 100.1, Efectivo: 50.25 })
     expect(totalBloque(fotoPrueba, cuentas, 'liquidez')).toBe(totalBloque(sinFantasma, cuentas, 'liquidez'))
   })
 
@@ -141,32 +96,32 @@ describe('totalBloque', () => {
   })
 
   it('no arrastra la cola del float al sumar', () => {
-    const conCola = foto('2026-09-22', { Nómina: 0.1, Efectivo: 0.2 })
+    const conCola = foto('2026-06-30', { Nómina: 0.1, Efectivo: 0.2 })
     expect(totalBloque(conCola, cuentas, 'liquidez')).toBe(0.3)
   })
 })
 
 describe('totalDeuda', () => {
-  it('cuadra con las cuatro deudas del Plan de libertad financiera', () => {
-    expect(totalDeuda(DEUDAS_SEMILLA)).toEqual({
-      propia: 91953.13,
-      compartida: 12969,
-      total: 104922.13,
+  it('suma la deuda propia y separa la compartida', () => {
+    expect(totalDeuda(DEUDAS_EJEMPLO)).toEqual({
+      propia: 2000,
+      compartida: 500,
+      total: 2500,
     })
   })
 
-  it('separa la deuda compartida de la propia', () => {
+  it('cuenta la deuda aunque venga en una lista sin más', () => {
     const deudas: Deuda[] = [
-      { nombre: 'Hipoteca', saldo: 1000, fechaSaldo: '2026-09-22', compartida: false, activa: true },
-      { nombre: 'Préstamo de ella', saldo: 500, fechaSaldo: '2026-09-22', compartida: true, activa: true },
+      { nombre: 'Deuda A de ejemplo', saldo: 1000, fechaSaldo: '2026-04-30', compartida: false, activa: true },
+      { nombre: 'Deuda B de ejemplo', saldo: 500, fechaSaldo: '2026-04-30', compartida: true, activa: true },
     ]
     expect(totalDeuda(deudas)).toEqual({ propia: 1000, compartida: 500, total: 1500 })
   })
 
   it('ignora las deudas desactivadas, que son las ya canceladas', () => {
     const deudas: Deuda[] = [
-      { nombre: 'Hipoteca', saldo: 1000, fechaSaldo: '2026-09-22', compartida: false, activa: true },
-      { nombre: 'Pignoración cancelada', saldo: 7184.29, fechaSaldo: '2026-09-22', compartida: false, activa: false },
+      { nombre: 'Deuda viva de ejemplo', saldo: 1000, fechaSaldo: '2026-04-30', compartida: false, activa: true },
+      { nombre: 'Deuda cancelada de ejemplo', saldo: 700, fechaSaldo: '2026-04-30', compartida: false, activa: false },
     ]
     expect(totalDeuda(deudas).propia).toBe(1000)
   })
@@ -177,10 +132,10 @@ describe('totalDeuda', () => {
 })
 
 describe('calculaPatrimonio', () => {
-  const fotoPrueba = foto('2026-09-22', { Nómina: 1000, Fondo: 2000 })
+  const fotoPrueba = foto('2026-06-30', { Nómina: 1000, Fondo: 2000 })
   const deudas: Deuda[] = [
-    { nombre: 'Hipoteca', saldo: 83738.84, fechaSaldo: '2026-09-22', compartida: false, activa: true },
-    { nombre: 'Préstamo de ella', saldo: 12969, fechaSaldo: '2026-09-22', compartida: true, activa: true },
+    { nombre: 'Deuda propia de ejemplo', saldo: 1000, fechaSaldo: '2026-06-30', compartida: false, activa: true },
+    { nombre: 'Deuda compartida de ejemplo', saldo: 500, fechaSaldo: '2026-06-30', compartida: true, activa: true },
   ]
 
   it('suma liquidez y activos en el bruto', () => {
@@ -196,24 +151,26 @@ describe('calculaPatrimonio', () => {
 
   it('resta la deuda propia del neto', () => {
     const patrimonio = calculaPatrimonio(fotoPrueba, cuentas, deudas)
-    expect(patrimonio.deuda).toBe(83738.84)
-    expect(patrimonio.neto).toBe(3000 - 83738.84)
+    expect(patrimonio.deuda).toBe(1000)
+    expect(patrimonio.neto).toBe(2000)
   })
 
   it('no resta la deuda compartida, pero la informa aparte', () => {
     const patrimonio = calculaPatrimonio(fotoPrueba, cuentas, deudas)
-    expect(patrimonio.deudaCompartida).toBe(12969)
-    expect(patrimonio.neto).not.toBe(3000 - 83738.84 - 12969)
+    expect(patrimonio.deudaCompartida).toBe(500)
+    // 2.000 (solo la propia), no 1.500.
+    expect(patrimonio.neto).toBe(2000)
+    expect(patrimonio.neto).not.toBe(1500)
   })
 
-  it('con deudaIncluida en false enseña el mismo neto que decía el Excel', () => {
-    // Sirve para poder poner las dos cifras juntas: lo que decía el Excel y la realidad.
+  it('con deudaIncluida en false enseña el mismo neto que el bruto', () => {
+    // Sirve para poder poner las dos cifras juntas: el bruto y la realidad.
     const conDeuda = calculaPatrimonio(fotoPrueba, cuentas, deudas, true)
     const sinDeuda = calculaPatrimonio(fotoPrueba, cuentas, deudas, false)
-    expect(conDeuda.neto).toBe(-80738.84)
+    expect(conDeuda.neto).toBe(2000)
     expect(sinDeuda.neto).toBe(3000)
     // La deuda se sigue informando aunque no se reste: la pantalla la necesita.
-    expect(sinDeuda.deuda).toBe(83738.84)
+    expect(sinDeuda.deuda).toBe(1000)
   })
 
   it('sin foto devuelve ceros y una deuda que no se puede pagar con nada', () => {
@@ -222,17 +179,20 @@ describe('calculaPatrimonio', () => {
       liquidez: 0,
       activos: 0,
       bruto: 0,
-      deuda: 83738.84,
-      deudaCompartida: 12969,
-      neto: -83738.84,
+      deuda: 1000,
+      deudaCompartida: 500,
+      neto: -1000,
     })
   })
 
   it('el neto es negativo cuando la deuda supera al bruto: no se pone a cero ni en valor absoluto', () => {
-    const patrimonio = calculaPatrimonio(fotoPrueba, cuentas, deudas)
-    expect(patrimonio.neto).toBeLessThan(0)
+    const conDeudaGrande: Deuda[] = [
+      { nombre: 'Deuda grande de ejemplo', saldo: 5000, fechaSaldo: '2026-06-30', compartida: false, activa: true },
+    ]
+    const patrimonio = calculaPatrimonio(fotoPrueba, cuentas, conDeudaGrande)
+    expect(patrimonio.neto).toBe(-2000)
     expect(patrimonio.neto).not.toBe(0)
-    expect(patrimonio.neto).not.toBe(80738.84)
+    expect(patrimonio.neto).not.toBe(2000)
   })
 })
 
@@ -271,8 +231,8 @@ describe('seriePatrimonio', () => {
 
 describe('ultimosValores', () => {
   it('se queda con el último valor conocido de cada cuenta', () => {
-    const fotos = [foto('2026-01-01', { Nómina: 10, Fondo: 100 }), foto('2026-02-01', { Nómina: 20, Mintos: 5 })]
-    expect(ultimosValores(fotos)).toEqual({ Nómina: 20, Fondo: 100, Mintos: 5 })
+    const fotos = [foto('2026-01-01', { Nómina: 10, Fondo: 100 }), foto('2026-02-01', { Nómina: 20, Otro: 5 })]
+    expect(ultimosValores(fotos)).toEqual({ Nómina: 20, Fondo: 100, Otro: 5 })
   })
 
   it('no le importa el orden en que le lleguen las fotos', () => {
@@ -285,8 +245,8 @@ describe('ultimosValores', () => {
   })
 
   it('mantiene el valor de una cuenta que ya no aparece en la última foto', () => {
-    const fotos = [foto('2026-01-01', { Degiro: 206.85 }), foto('2026-02-01', { Nómina: 20 })]
-    expect(ultimosValores(fotos)).toEqual({ Degiro: 206.85, Nómina: 20 })
+    const fotos = [foto('2026-01-01', { 'Fondo antiguo': 250 }), foto('2026-02-01', { Nómina: 20 })]
+    expect(ultimosValores(fotos)).toEqual({ 'Fondo antiguo': 250, Nómina: 20 })
   })
 })
 
@@ -338,166 +298,148 @@ describe('variacionEntre', () => {
 })
 
 // ---------------------------------------------------------------------------
-// La prueba clave: las 36 fotos del Excel de Óscar
+// La prueba clave, con los datos de ejemplo
 // ---------------------------------------------------------------------------
 
-describeConHistorico('las 36 fotos del histórico real cuadran con el Excel', () => {
-  const fotosExcel: [string, FotoExcel][] = (historico?.patrimonio ?? []).map((f) => [f.fecha, f])
+describe('las fotos de ejemplo cuadran con sus totales', () => {
+  const totalesEsperados: [string, number, number][] = [
+    ['2026-01-31', 1600, 2300],
+    ['2026-02-28', 1800, 2400],
+    ['2026-03-31', 1700, 2300],
+    ['2026-04-30', 2400, 2500],
+  ]
 
-  it('el histórico trae las 36 fotos y la extracción no reconoce ningún descuadre', () => {
-    expect(historico.patrimonio).toHaveLength(36)
-    expect(historico.resumen.descuadres).toBe(0)
-    expect(FOTOS_SEMILLA).toHaveLength(36)
-  })
+  it.each(totalesEsperados)(
+    '%s: cada bloque suma lo que dice el ejemplo (liquidez %d, activos %d)',
+    (fecha, liquidez, activos) => {
+      const delEjemplo = FOTOS_EJEMPLO.find((f) => f.fecha === fecha)
+      expect(delEjemplo, `falta la foto ${fecha} en FOTOS_EJEMPLO`).toBeDefined()
+      expect(totalBloque(delEjemplo, CUENTAS_EJEMPLO, 'liquidez')).toBe(liquidez)
+      expect(totalBloque(delEjemplo, CUENTAS_EJEMPLO, 'activo')).toBe(activos)
+    },
+  )
 
-  it('la semilla tiene una foto para cada una de las 36 fechas del Excel y ninguna de más', () => {
-    const fechasExcel = historico.patrimonio.map((f) => f.fecha)
-    const fechasSemilla = FOTOS_SEMILLA.map((f) => f.fecha)
-    expect(fechasSemilla).toEqual(fechasExcel)
-  })
-
-  it.each(fotosExcel)('%s: totalBloque reproduce totalLiquidez y totalActivos del Excel', (fecha, delExcel) => {
-    const deSemilla = FOTOS_SEMILLA.find((f) => f.fecha === fecha)
-    expect(deSemilla, `falta la foto ${fecha} en FOTOS_SEMILLA`).toBeDefined()
-    expect(totalBloque(deSemilla, CUENTAS_SEMILLA, 'liquidez')).toBe(delExcel.totalLiquidez)
-    expect(totalBloque(deSemilla, CUENTAS_SEMILLA, 'activo')).toBe(delExcel.totalActivos)
-  })
-
-  it('ninguna de las 36 fotos descuadra: el listado de fallos está vacío', () => {
-    // Se recogen todos los descuadres en una lista para que, si algún día falla, el mensaje
-    // diga exactamente qué mes y qué bloque se ha ido, en vez de parar en el primero.
-    const descuadres: string[] = []
-    for (const delExcel of historico.patrimonio) {
-      const deSemilla = FOTOS_SEMILLA.find((f) => f.fecha === delExcel.fecha)
-      const liquidez = totalBloque(deSemilla, CUENTAS_SEMILLA, 'liquidez')
-      const activos = totalBloque(deSemilla, CUENTAS_SEMILLA, 'activo')
-      if (liquidez !== delExcel.totalLiquidez) {
-        descuadres.push(`${delExcel.fecha}: liquidez ${liquidez} != Excel ${delExcel.totalLiquidez}`)
-      }
-      if (activos !== delExcel.totalActivos) {
-        descuadres.push(`${delExcel.fecha}: activos ${activos} != Excel ${delExcel.totalActivos}`)
-      }
-    }
-    expect(descuadres).toEqual([])
-  })
-
-  it('cada cuenta del Excel está clasificada en el mismo bloque en la semilla', () => {
-    // El bloque no lo decide el Excel al leerlo, lo decide CUENTAS_SEMILLA: si una cuenta
-    // estuviera en el bloque contrario, los dos totales seguirían cuadrando por separado
-    // solo de casualidad, así que se comprueba cuenta por cuenta.
-    const bloqueEnSemilla = new Map(CUENTAS_SEMILLA.map((c) => [c.nombre, c.bloque]))
-    const malClasificadas = new Set<string>()
-    for (const delExcel of historico.patrimonio) {
-      for (const valor of delExcel.liquidez) {
-        if (bloqueEnSemilla.get(valor.cuenta) !== 'liquidez') malClasificadas.add(valor.cuenta)
-      }
-      for (const valor of delExcel.activos) {
-        if (bloqueEnSemilla.get(valor.cuenta) !== 'activo') malClasificadas.add(valor.cuenta)
-      }
-    }
-    expect([...malClasificadas]).toEqual([])
+  it('el ejemplo trae 4 fotos de fechas distintas y 5 cuentas repartidas en los dos bloques', () => {
+    expect(FOTOS_EJEMPLO).toHaveLength(4)
+    expect(new Set(FOTOS_EJEMPLO.map((f) => f.fecha)).size).toBe(4)
+    expect(CUENTAS_EJEMPLO).toHaveLength(5)
+    expect(CUENTAS_EJEMPLO.filter((c) => c.bloque === 'liquidez')).toHaveLength(3)
+    expect(CUENTAS_EJEMPLO.filter((c) => c.bloque === 'activo')).toHaveLength(2)
   })
 
   it('ninguna partida se pierde por el camino: toda cuenta está en el catálogo', () => {
-    const nombres = new Set(CUENTAS_SEMILLA.map((c) => c.nombre))
+    const nombres = new Set(CUENTAS_EJEMPLO.map((c) => c.nombre))
     const desconocidas = new Set<string>()
-    for (const deSemilla of FOTOS_SEMILLA) {
-      for (const valor of deSemilla.valores) {
+    for (const delEjemplo of FOTOS_EJEMPLO) {
+      for (const valor of delEjemplo.valores) {
         if (!nombres.has(valor.cuenta)) desconocidas.add(valor.cuenta)
       }
     }
     expect([...desconocidas]).toEqual([])
   })
 
-  it('el Excel no registraba ninguna deuda: sus pasivos están vacíos y su neto es el total', () => {
-    for (const delExcel of historico.patrimonio) {
-      expect(delExcel.pasivos).toEqual([])
-      expect(delExcel.totalPasivos ?? 0).toBe(0)
-      expect(delExcel.neto).toBe(delExcel.total)
-    }
-  })
-
-  it('el bruto de la app coincide con el "VALOR NETO TOTAL" del Excel en las 36 fotos', () => {
-    const descuadres: string[] = []
-    for (const delExcel of historico.patrimonio) {
-      const deSemilla = FOTOS_SEMILLA.find((f) => f.fecha === delExcel.fecha)
-      const { bruto } = calculaPatrimonio(deSemilla, CUENTAS_SEMILLA, DEUDAS_SEMILLA, false)
-      if (bruto !== delExcel.total) descuadres.push(`${delExcel.fecha}: ${bruto} != ${delExcel.total}`)
-    }
-    expect(descuadres).toEqual([])
-  })
-
-  it('la primera foto suma 15.970,74 € y la última 45.283,34 €', () => {
-    const primera = calculaPatrimonio(FOTOS_SEMILLA[0], CUENTAS_SEMILLA, [], false)
-    const ultima = calculaPatrimonio(ultimaFoto(FOTOS_SEMILLA) as FotoPatrimonio, CUENTAS_SEMILLA, [], false)
-    expect(primera.bruto).toBe(15970.74)
-    expect(ultima.bruto).toBe(45283.34)
+  it('el bruto de la primera foto es 3.900 € y el de la última 4.900 €', () => {
+    const primera = calculaPatrimonio(FOTOS_EJEMPLO[0], CUENTAS_EJEMPLO, [], false)
+    const ultima = calculaPatrimonio(ultimaFoto(FOTOS_EJEMPLO) as FotoPatrimonio, CUENTAS_EJEMPLO, [], false)
+    expect(primera.bruto).toBe(3900)
+    expect(ultima.bruto).toBe(4900)
     // Sin el redondeo de `bruto`, sumar los bloques a mano arrastra la cola del float.
-    expect(primera.liquidez + primera.activos).toBeCloseTo(15970.74, 2)
-    expect(ultima.liquidez + ultima.activos).toBeCloseTo(45283.34, 2)
+    expect(primera.liquidez + primera.activos).toBeCloseTo(3900, 2)
+    expect(ultima.liquidez + ultima.activos).toBeCloseTo(4900, 2)
   })
 
-  it('el patrimonio bruto crece, pero el neto real es negativo', () => {
-    // La corrección central de Oikos frente al Excel: el bruto (45.283,34) es real, pero
-    // con las deudas sembradas (91.953,13 propias) el neto es -46.669,79 €.
-    const ultima = ultimaFoto(FOTOS_SEMILLA) as FotoPatrimonio
-    const conDeuda = calculaPatrimonio(ultima, CUENTAS_SEMILLA, DEUDAS_SEMILLA)
-    const comoElExcel = calculaPatrimonio(ultima, CUENTAS_SEMILLA, DEUDAS_SEMILLA, false)
-    expect(comoElExcel.neto).toBe(45283.34)
-    expect(conDeuda.neto).toBe(-46669.79)
-    expect(conDeuda.deuda).toBe(91953.13)
-    expect(conDeuda.deudaCompartida).toBe(12969)
-    expect(conDeuda.neto).toBeLessThan(0)
+  it('con las deudas de ejemplo el neto de la última foto baja de 4.900 a 2.900 €', () => {
+    const ultima = ultimaFoto(FOTOS_EJEMPLO) as FotoPatrimonio
+    const conDeuda = calculaPatrimonio(ultima, CUENTAS_EJEMPLO, DEUDAS_EJEMPLO)
+    const sinDeuda = calculaPatrimonio(ultima, CUENTAS_EJEMPLO, DEUDAS_EJEMPLO, false)
+    expect(sinDeuda.neto).toBe(4900)
+    expect(conDeuda.neto).toBe(2900)
+    expect(conDeuda.deuda).toBe(2000)
+    // La compartida se informa, pero no se resta: 2.900, no 2.400.
+    expect(conDeuda.deudaCompartida).toBe(500)
   })
 
-  it('la serie del histórico tiene 36 puntos y sus variaciones suman el crecimiento total', () => {
-    const serie = seriePatrimonio(FOTOS_SEMILLA, CUENTAS_SEMILLA)
-    expect(serie).toHaveLength(36)
+  it('la serie del ejemplo tiene 4 puntos y sus variaciones suman el crecimiento total', () => {
+    const serie = seriePatrimonio(FOTOS_EJEMPLO, CUENTAS_EJEMPLO)
+    expect(serie).toHaveLength(4)
     expect(serie[0].variacion).toBeNull()
-    expect(serie[35].bruto).toBe(45283.34)
-    expect(serie[35].variacion).toBe(3572.58)
+    expect(serie.map((p) => p.variacion)).toEqual([null, 300, -200, 900])
     const crecimiento = serie.reduce((total, punto) => total + (punto.variacion ?? 0), 0)
-    expect(Number(crecimiento.toFixed(2))).toBe(29312.6)
+    expect(Number(crecimiento.toFixed(2))).toBe(1000)
   })
 
-  it('la variación de todo el histórico y la del último año largo', () => {
-    expect(variacionEntre(FOTOS_SEMILLA, CUENTAS_SEMILLA, '2024-01-01', '2026-09-22')).toBe(29312.6)
-    expect(variacionEntre(FOTOS_SEMILLA, CUENTAS_SEMILLA, '2025-01-19', '2026-09-22')).toBe(20712.16)
+  it('la variación de todo el ejemplo es de 1.000 €', () => {
+    expect(variacionEntre(FOTOS_EJEMPLO, CUENTAS_EJEMPLO, '2026-01-31', '2026-04-30')).toBe(1000)
   })
 
-  it('los últimos valores conocidos de cada cuenta son los de la última foto', () => {
-    const valores = ultimosValores(FOTOS_SEMILLA)
-    expect(valores['Cuenta nómina (ING)']).toBe(1190.4)
-    expect(valores['Bitcoin']).toBe(14687.82)
-    expect(valores['MyInvestor fondos']).toBe(14996.65)
-    expect(valores['Trading']).toBe(199.43)
-    // Degiro y el préstamo recibido ya no están en la última foto, pero se conserva lo
-    // último que se supo de ellos: es lo que precarga la pantalla al hacer la foto nueva.
-    expect(valores['Degiro']).toBe(206.85)
-    expect(valores['Préstamo recibido']).toBe(7900)
+  it('los últimos valores conocidos son los de la última foto, y no se pierde una cuenta que ya no sale', () => {
+    expect(ultimosValores(FOTOS_EJEMPLO)).toEqual({
+      'Cuenta de ejemplo': 1500,
+      'Cuenta de ahorro de ejemplo': 800,
+      'Efectivo de ejemplo': 100,
+      'Fondo de ejemplo': 2500,
+      // Desaparece de las dos últimas fotos, pero se conserva lo último que se supo de ella.
+      'Plan antiguo de ejemplo': 300,
+    })
   })
 
-  it('la última foto es la del 2026-09-22', () => {
-    expect(ultimaFoto(FOTOS_SEMILLA)?.fecha).toBe('2026-09-22')
+  it('la última foto es la del 2026-04-30', () => {
+    expect(ultimaFoto(FOTOS_EJEMPLO)?.fecha).toBe('2026-04-30')
   })
 
-  it('el catálogo trae las 18 cuentas del histórico, 13 de ellas en uso', () => {
-    expect(CUENTAS_SEMILLA).toHaveLength(18)
-    expect(CUENTAS_SEMILLA.filter((c) => c.activa)).toHaveLength(13)
-    expect(CUENTAS_SEMILLA.filter((c) => c.bloque === 'liquidez')).toHaveLength(8)
-    expect(CUENTAS_SEMILLA.filter((c) => c.bloque === 'activo')).toHaveLength(10)
-  })
-
-  it('la comparación es sensible a una sola cuenta mal clasificada', () => {
-    // Comprobación de que la prueba clave sirve para algo: moviendo Bitcoin de bloque, la
-    // comparación con el Excel tiene que romperse. Si esto no fallara, la prueba de las 36
-    // fotos podría estar pasando por casualidad.
-    const malClasificadas = CUENTAS_SEMILLA.map((cuenta): Cuenta =>
-      cuenta.nombre === 'Bitcoin' ? { ...cuenta, bloque: 'liquidez' } : cuenta,
+  it('cambiar una cuenta de bloque mueve los totales, así que la clasificación se usa de verdad', () => {
+    // Comprobación de que la prueba clave sirve para algo: si `totalBloque` ignorara el bloque
+    // del catálogo, los totales saldrían iguales y lo de arriba estaría pasando por casualidad.
+    // Y el total de los dos bloques juntos no puede moverse: la cuenta solo cambia de sitio.
+    const malClasificadas = CUENTAS_EJEMPLO.map((cuenta): Cuenta =>
+      cuenta.nombre === 'Fondo de ejemplo' ? { ...cuenta, bloque: 'liquidez' } : cuenta,
     )
-    const ultima = FOTOS_SEMILLA.find((f) => f.fecha === '2026-09-22') as FotoPatrimonio
-    const delExcel = historico.patrimonio.find((f) => f.fecha === '2026-09-22') as FotoExcel
-    expect(totalBloque(ultima, CUENTAS_SEMILLA, 'liquidez')).toBe(delExcel.totalLiquidez)
-    expect(totalBloque(ultima, malClasificadas, 'liquidez')).not.toBe(delExcel.totalLiquidez)
+    const ultima = FOTOS_EJEMPLO[3]
+    const liquidezBuena = totalBloque(ultima, CUENTAS_EJEMPLO, 'liquidez')
+    const activosBuenos = totalBloque(ultima, CUENTAS_EJEMPLO, 'activo')
+    expect(totalBloque(ultima, malClasificadas, 'liquidez')).not.toBe(liquidezBuena)
+    expect(
+      totalBloque(ultima, malClasificadas, 'liquidez') + totalBloque(ultima, malClasificadas, 'activo'),
+    ).toBeCloseTo(liquidezBuena + activosBuenos, 2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Coherencia de la copia personal (sin cifras suyas)
+// ---------------------------------------------------------------------------
+
+/*
+ * La copia personal de Óscar vive fuera del repositorio (ver `ayuda-pruebas`). En una copia
+ * limpia —y en el flujo de publicación de GitHub, que clona el repositorio— no está, así que
+ * este bloque se SALTA con `describe.skipIf` en vez de reventar.
+ *
+ * Aquí no se escribe ni una cifra suya: son comprobaciones de relaciones (que no haya cuentas
+ * huérfanas, que no haya dos fotos del mismo día). Sus números están en su fichero, y el
+ * repositorio es público.
+ */
+describe.skipIf(!hayCopiaPersonal)('la copia personal es coherente', () => {
+  it('todas las cuentas de sus fotos están en su catálogo', () => {
+    const nombres = new Set(CUENTAS_REALES.map((c) => c.nombre))
+    const desconocidas = new Set<string>()
+    for (const fotoReal of FOTOS_REALES) {
+      for (const valor of fotoReal.valores) {
+        if (!nombres.has(valor.cuenta)) desconocidas.add(valor.cuenta)
+      }
+    }
+    expect([...desconocidas]).toEqual([])
+  })
+
+  it('cada foto es de un día distinto y vienen de la más antigua a la más reciente', () => {
+    const fechas = FOTOS_REALES.map((f) => f.fecha)
+    expect(new Set(fechas).size).toBe(fechas.length)
+    expect([...fechas].sort()).toEqual(fechas)
+  })
+
+  it('todas sus deudas traen saldo positivo y fecha del saldo', () => {
+    expect(DEUDAS_REALES.length).toBeGreaterThan(0)
+    for (const deuda of DEUDAS_REALES) {
+      expect(deuda.saldo).toBeGreaterThan(0)
+      expect(deuda.fechaSaldo).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
   })
 })

@@ -22,7 +22,7 @@
  * Al cambiar este archivo, sube VERSION.
  */
 
-const VERSION = 'v1'
+const VERSION = 'v2'
 const CACHE = `oikos-${VERSION}`
 /** Tiempo maximo que se espera a la red al abrir la app, antes de usar la copia. */
 const LIMITE_NAVEGACION_MS = 2500

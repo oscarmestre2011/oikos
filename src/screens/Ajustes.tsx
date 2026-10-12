@@ -11,7 +11,7 @@ import {
   guardaCategoria,
   guardaCuenta,
   importaCopia,
-  ORIGEN_HISTORICO,
+  DATOS_DE_PARTIDA,
   reiniciarConSemilla,
   renombraCategoria,
   renombraCuenta,
@@ -135,7 +135,7 @@ export function Ajustes({ nav, hoy, onError }: Props) {
 
       <Tarjeta titulo="Tus objetivos del mes">
         <FilaAjuste
-          etiqueta="Inversión mensual (MSCI World)"
+          etiqueta="Inversión mensual"
           clave="objetivoInversion"
           inicial={ajusteInversion}
           onError={onError}
@@ -324,8 +324,9 @@ export function Ajustes({ nav, hoy, onError }: Props) {
         <div className="separador" />
 
         <p className="texto-suave">
-          El histórico del Excel se puede volver a cargar tal cual: es útil si has hecho pruebas y quieres
-          dejarlo como estaba.
+          Puedes volver a los datos de partida (las categorías y las cuentas genéricas de fábrica): es
+          útil si has hecho pruebas y quieres dejarlo limpio. <strong>Se borra todo lo que hayas
+          apuntado o importado</strong>, así que guarda antes una copia.
         </p>
         <button
           type="button"
@@ -337,10 +338,10 @@ export function Ajustes({ nav, hoy, onError }: Props) {
             }
             await reiniciarConSemilla()
             setConfirmarReinicio(false)
-            setEstado('Histórico del Excel recargado. Lo que hubieras apuntado se ha borrado.')
+            setEstado('Datos de partida restaurados. Lo que hubieras apuntado o importado se ha borrado.')
           }}
         >
-          {confirmarReinicio ? 'Confirmar: se borra lo que hayas apuntado' : 'Recargar el histórico del Excel'}
+          {confirmarReinicio ? 'Confirmar: se borra lo que hayas apuntado' : 'Volver a los datos de partida'}
         </button>
 
         <button
@@ -387,16 +388,14 @@ export function Ajustes({ nav, hoy, onError }: Props) {
             móvil (IndexedDB). Oikos no envía nada a ningún servidor, porque no hay servidor.
           </p>
           <div className="separador" />
-          <p className="cifra__etiqueta">De dónde sale el histórico</p>
+          <p className="cifra__etiqueta">Qué lleva la app dentro</p>
           <p className="texto-tenue">
-            {ORIGEN_HISTORICO.fotos} fotos de patrimonio ({ORIGEN_HISTORICO.primeraFoto} →{' '}
-            {ORIGEN_HISTORICO.ultimaFoto}), {ORIGEN_HISTORICO.movimientos} movimientos,{' '}
-            {ORIGEN_HISTORICO.comprasBitcoin} compras de Bitcoin ({ORIGEN_HISTORICO.btcTotal} BTC).
+            Nada tuyo. Trae {DATOS_DE_PARTIDA.categorias} categorías, {DATOS_DE_PARTIDA.cuentas} cuentas
+            genéricas y <strong>ninguna deuda</strong>, porque Oikos se publica en internet y meter aquí tus
+            cifras sería publicarlas.
             <br />
-            Origen: <code>{ORIGEN_HISTORICO.csv}</code> y <code>{ORIGEN_HISTORICO.excel}</code>.
-            <br />
-            Extraído el {ORIGEN_HISTORICO.extraido.slice(0, 10)} · descuadres contra las fórmulas del
-            Excel: {ORIGEN_HISTORICO.descuadresContraElExcel}.
+            Tu histórico va aparte, en el archivo <code>{DATOS_DE_PARTIDA.archivoDeCopia}</code>, y entra
+            con <strong>Importar una copia</strong> (aquí arriba). Ese archivo no sale de tus dispositivos.
           </p>
           <div className="separador" />
           <p className="cifra__etiqueta">Novedades de esta versión</p>
