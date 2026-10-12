@@ -73,6 +73,33 @@ async function main() {
     }
   }
 
+  /**
+   * Espera a que un texto APAREZCA y devuelve si lo ha hecho.
+   *
+   * Se usa en lugar de leer el texto de la pantalla y compararlo: leer y comparar es una
+   * carrera, porque justo después de pulsar un botón el dato todavía no se ha actualizado en
+   * pantalla y la comprobación falla sin que la app tenga nada malo. Esperar al texto bueno (con
+   * un límite de tiempo) es lo que se quiere decir de verdad: "esto tiene que acabar saliendo".
+   */
+  const aparece = async (texto, limiteMs = 5_000) => {
+    try {
+      await pagina.getByText(texto, { exact: false }).first().waitFor({ timeout: limiteMs })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Espera a que un texto DESAPAREZCA. */
+  const desaparece = async (texto, limiteMs = 5_000) => {
+    try {
+      await pagina.getByText(texto, { exact: false }).first().waitFor({ state: 'detached', timeout: limiteMs })
+      return true
+    } catch {
+      return false
+    }
+  }
+
   try {
     await pagina.goto(servidor.url, { waitUntil: 'domcontentloaded' })
     await entraEnLaApp(pagina, { destino: 'Entrar en la app' })
@@ -272,6 +299,64 @@ async function main() {
     comprueba.comprueba(
       copiaFinal.presupuestos.length === 1,
       'Ni duplica el presupuesto',
+    )
+
+    // =====================================================================
+    // 7. Las deudas: son lo que corrige el fallo del Excel, así que se prueban
+    // =====================================================================
+    await pagina.getByRole('button', { name: 'Patrimonio', exact: true }).click()
+    await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
+    const netoAntesDeLasDeudas = await pagina.locator('.cifra').first().innerText()
+
+    await pagina.getByRole('button', { name: 'Revisar las deudas' }).click()
+    await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })
+    comprueba.comprueba(
+      (await pagina.locator('body').innerText()).includes('91.953,13'),
+      'La deuda propia suma hipoteca + pignoración + Firefish (91.953,13 €)',
+    )
+
+    // --- Editar el saldo de la hipoteca ---
+    const tarjetaHipoteca = pagina.locator('.tarjeta').filter({ hasText: 'Hipoteca (ING)' })
+    await tarjetaHipoteca.getByRole('button', { name: 'Editar' }).click()
+    const campoSaldo = pagina.getByLabel('Capital pendiente')
+    await campoSaldo.waitFor({ timeout: 10_000 })
+    comprueba.comprueba(
+      (await campoSaldo.inputValue()).replace('.', ',') === '83738,84',
+      'El formulario viene con el saldo que había',
+    )
+    await campoSaldo.fill('80000')
+    await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
+    comprueba.comprueba(
+      await aparece('88.214,29'),
+      'Al corregir el saldo de la hipoteca, el total de deuda se recalcula',
+    )
+
+    // --- Marcar una deuda como pagada ---
+    const tarjetaFirefish = pagina.locator('.tarjeta').filter({ hasText: 'Firefish' })
+    await tarjetaFirefish.getByRole('button', { name: 'Marcar como pagada' }).click()
+    comprueba.comprueba(await aparece('87.184,29'), 'Una deuda pagada deja de contar en el total')
+
+    // --- Añadir una deuda y borrarla ---
+    await pagina.getByRole('button', { name: '+ Añadir una deuda' }).click()
+    await pagina.getByLabel('Nombre').fill('Deuda de prueba')
+    await pagina.getByLabel('Capital pendiente').fill('500')
+    await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
+    comprueba.comprueba(await aparece('87.684,29'), 'Una deuda nueva entra en el total')
+
+    const tarjetaPrueba = pagina.locator('.tarjeta').filter({ hasText: 'Deuda de prueba' })
+    await tarjetaPrueba.getByRole('button', { name: 'Editar' }).click()
+    await pagina.getByRole('button', { name: 'Borrar', exact: true }).click()
+    await pagina.getByRole('button', { name: 'Confirmar borrado' }).click()
+    comprueba.comprueba(
+      await desaparece('Deuda de prueba'),
+      'Borrar una deuda pide confirmación y la quita',
+    )
+
+    await pagina.getByRole('button', { name: 'Volver', exact: true }).click()
+    await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
+    comprueba.comprueba(
+      (await pagina.locator('.cifra').first().innerText()) !== netoAntesDeLasDeudas,
+      'El patrimonio neto cambia al corregir las deudas (es lo que el Excel no hacía)',
     )
 
     comprueba.comprueba(errores.length === 0, `Sin errores en consola${errores.length ? `: ${errores[0]}` : ''}`)
