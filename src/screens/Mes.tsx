@@ -4,7 +4,7 @@ import { Cifra } from '../components/Cifra'
 import { Tarjeta } from '../components/Tarjeta'
 import { useAjusteNumero, useMovimientos } from '../hooks'
 import { formateaImporte, formateaPorcentaje, redondea } from '../lib/dinero'
-import { diasDelMes, diasTranscurridos, esMesActual, esMesFuturo, mesAnterior, mesDe, mesSiguiente, nombreMes } from '../lib/fechas'
+import { diasDelMes, diasTranscurridos, esMesActual, esMesFuturo, mesAnterior, mesDe, mesSiguiente, nombreMes, nombreMesCorto } from '../lib/fechas'
 import { costeFijoAnual, costeFijoMensual, detectaRecurrentes } from '../lib/recurrentes'
 import { compararConMedia, resumenMes } from '../lib/resumen'
 import type { PropsPantalla } from '../navegacion'
@@ -188,36 +188,59 @@ export function Mes({ nav, hoy }: PropsPantalla) {
         </Tarjeta>
       )}
 
-      {suscripciones.length > 0 && (
-        <Tarjeta titulo="Gastos que se repiten">
-          <Cifra
-            valor={formateaImporte(costeFijoMensual(recurrentes))}
-            etiqueta="Te cuestan al mes (solo gastos)"
-            tamano="mediana"
-          />
-          <div className="lista" style={{ marginTop: 10 }}>
-            {suscripciones.slice(0, 8).map((recurrente) => (
-              <div className="fila" key={`${recurrente.tipo}-${recurrente.concepto}`} style={{ padding: '9px 0' }}>
-                <span className="fila__principal">
-                  <span className="fila__titulo">{recurrente.etiqueta}</span>
-                  <span className="fila__detalle">
-                    {recurrente.categoria} · día {recurrente.diaHabitual} ·{' '}
-                    {recurrente.periodicidadMeses === 1
-                      ? 'cada mes'
-                      : `cada ${recurrente.periodicidadMeses} meses`}
-                    {recurrente.variable && ' · importe variable'}
+      {/*
+        Esta tarjeta se enseña SIEMPRE, aunque esté vacía. Con los datos reales de Óscar sale
+        vacía (el CSV solo tiene marzo y abril de 2026), y si se ocultara, la función de detectar
+        suscripciones sería invisible: nadie echa de menos lo que no sabe que existe. Una tarjeta
+        que explica por qué está vacía vale más que una tarjeta que no está.
+      */}
+      <Tarjeta titulo="Gastos que se repiten">
+        {suscripciones.length === 0 ? (
+          <>
+            <p className="texto-suave" style={{ marginTop: 0 }}>
+              Todavía no hay ninguno que se pueda dar por fijo. Para considerarlo hacen falta al menos{' '}
+              <strong>{minimoMeses} meses distintos</strong> con el mismo concepto y, como mucho, un cargo
+              al mes (así no se confunde la compra del supermercado con una suscripción).
+            </p>
+            <p className="texto-tenue" style={{ marginBottom: 0 }}>
+              Ahora hay {mesesConMovimiento.length}{' '}
+              {mesesConMovimiento.length === 1 ? 'mes' : 'meses'} con movimientos
+              {mesesConMovimiento.length > 0 && ` (${mesesConMovimiento.map(nombreMesCorto).join(', ')})`}, así
+              que esta tarjeta empezará a llenarse sola en cuanto apuntes unos meses más. Es lo que
+              permitirá saber de un vistazo cuánto te cuestan al año las cuotas y las suscripciones.
+            </p>
+          </>
+        ) : (
+          <>
+            <Cifra
+              valor={formateaImporte(costeFijoMensual(recurrentes))}
+              etiqueta="Te cuestan al mes (solo gastos)"
+              tamano="mediana"
+            />
+            <div className="lista" style={{ marginTop: 10 }}>
+              {suscripciones.slice(0, 8).map((recurrente) => (
+                <div className="fila" key={`${recurrente.tipo}-${recurrente.concepto}`} style={{ padding: '9px 0' }}>
+                  <span className="fila__principal">
+                    <span className="fila__titulo">{recurrente.etiqueta}</span>
+                    <span className="fila__detalle">
+                      {recurrente.categoria} · día {recurrente.diaHabitual} ·{' '}
+                      {recurrente.periodicidadMeses === 1
+                        ? 'cada mes'
+                        : `cada ${recurrente.periodicidadMeses} meses`}
+                      {recurrente.variable && ' · importe variable'}
+                    </span>
                   </span>
-                </span>
-                <span className="fila__importe">{formateaImporte(recurrente.importe)}</span>
-              </div>
-            ))}
-          </div>
-          <p className="texto-tenue" style={{ marginBottom: 0 }}>
-            Al año son {formateaImporte(costeFijoAnual(recurrentes))}. Se considera fijo lo que aparece en{' '}
-            {minimoMeses} meses distintos o más, y una vez al mes como mucho.
-          </p>
-        </Tarjeta>
-      )}
+                  <span className="fila__importe">{formateaImporte(recurrente.importe)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="texto-tenue" style={{ marginBottom: 0 }}>
+              Al año son {formateaImporte(costeFijoAnual(recurrentes))}. Se considera fijo lo que aparece en{' '}
+              {minimoMeses} meses distintos o más, y una vez al mes como mucho.
+            </p>
+          </>
+        )}
+      </Tarjeta>
 
       <button
         type="button"

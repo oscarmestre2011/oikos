@@ -13,7 +13,8 @@
  */
 
 import { chromium } from 'playwright'
-import { readFileSync, mkdirSync, existsSync } from 'node:fs'
+import { readFileSync, mkdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { creaComprobador, esperaServiceWorkerActivo, rutaChromium, sirveDirectorio } from './navegador.mjs'
@@ -51,6 +52,7 @@ async function main() {
     deviceScaleFactor: 2,
     locale: 'es-ES',
     timezoneId: 'Europe/Madrid',
+    acceptDownloads: true,
   })
   const pagina = await contexto.newPage()
 
@@ -117,6 +119,18 @@ async function main() {
     const textoMes = await pagina.locator('body').innerText()
     comprueba.comprueba(textoMes.includes('Alimentación'), 'El resumen del mes agrupa por categoría')
     comprueba.comprueba(textoMes.includes('12,50'), 'El resumen del mes suma el gasto nuevo')
+    // OJO: `innerText` devuelve el texto TAL COMO SE VE, y los títulos de las tarjetas van en
+    // mayúsculas por CSS (`text-transform`). Por eso aquí se compara en mayúsculas: buscar
+    // "Gastos que se repiten" en el texto visible no encontraría nada aunque esté en pantalla.
+    const textoMesMayusculas = textoMes.toUpperCase()
+    comprueba.comprueba(
+      textoMesMayusculas.includes('GASTOS QUE SE REPITEN'),
+      'La tarjeta de gastos repetidos está (aunque salga vacía, se explica)',
+    )
+    comprueba.comprueba(
+      textoMes.includes('mar 26') && textoMes.includes('abr 26'),
+      'Dice en qué meses hay datos, para entender por qué todavía no detecta ninguno',
+    )
     await captura('03-mes')
 
     // --- 5. Los movimientos del histórico están ------------------------
@@ -218,6 +232,82 @@ async function main() {
       comprueba.comprueba(respuesta.ok(), `El icono ${icono.src} existe de verdad`)
     }
 
+    // --- 11. La copia de seguridad se guarda de verdad -----------------
+    // Esto no se había probado nunca de punta a punta, y es la función de la que depende que
+    // no se pierdan las cuentas. No basta con que el botón exista: tiene que salir un archivo
+    // con los datos dentro.
+    await pagina.getByRole('button', { name: 'Ajustes', exact: true }).click()
+    await pagina.getByText('Copia de seguridad', { exact: true }).waitFor({ timeout: 10_000 })
+
+    const [descargaCopia] = await Promise.all([
+      pagina.waitForEvent('download', { timeout: 20_000 }),
+      pagina.getByRole('button', { name: /Compartir o descargar la copia/ }).click(),
+    ])
+    const rutaCopia = await descargaCopia.path()
+    comprueba.comprueba(
+      descargaCopia.suggestedFilename().startsWith('oikos-'),
+      `La copia se descarga con nombre con fecha (${descargaCopia.suggestedFilename()})`,
+    )
+
+    const copia = JSON.parse(readFileSync(rutaCopia, 'utf8'))
+    comprueba.comprueba(copia.app === 'oikos', 'El archivo de copia se identifica como de Oikos')
+    comprueba.comprueba(copia.fotos?.length === 36, `La copia lleva las 36 fotos (${copia.fotos?.length})`)
+    comprueba.comprueba(
+      copia.movimientos?.length === 25,
+      `La copia lleva los 24 movimientos del histórico más el apuntado (${copia.movimientos?.length})`,
+    )
+    comprueba.comprueba(
+      copia.movimientos?.some((m) => m.concepto === 'Prueba de humo'),
+      'La copia incluye el movimiento recién apuntado',
+    )
+    comprueba.comprueba(copia.deudas?.length === 4, 'La copia lleva las deudas')
+    comprueba.comprueba(copia.bitcoin?.length === 89, 'La copia lleva las 89 compras de Bitcoin')
+
+    // --- 12. La exportación a Markdown del vault ----------------------
+    const [descargaMd] = await Promise.all([
+      pagina.waitForEvent('download', { timeout: 20_000 }),
+      // El emoji distingue este botón del de "Markdown del patrimonio", que también empieza igual.
+      pagina.getByRole('button', { name: /📄 Markdown de/ }).click(),
+    ])
+    const markdown = readFileSync(await descargaMd.path(), 'utf8')
+    comprueba.comprueba(
+      descargaMd.suggestedFilename().endsWith('.md'),
+      `El Markdown se descarga como .md (${descargaMd.suggestedFilename()})`,
+    )
+    comprueba.comprueba(markdown.includes('tipo: finanzas'), 'El Markdown lleva el frontmatter del vault')
+    comprueba.comprueba(markdown.includes('## Movimientos'), 'El Markdown lleva la tabla de movimientos')
+    comprueba.comprueba(markdown.includes('Prueba de humo'), 'El Markdown incluye el movimiento apuntado')
+    comprueba.comprueba(
+      /^\| 2026-\d\d-\d\d \|/m.test(markdown),
+      'Las fechas del Markdown van en formato YYYY-MM-DD, como en el vault',
+    )
+    comprueba.comprueba(
+      markdown.includes('| 12,50 |'),
+      'Los importes van con coma decimal, como en el vault',
+    )
+
+    const [descargaPatrimonio] = await Promise.all([
+      pagina.waitForEvent('download', { timeout: 20_000 }),
+      pagina.getByRole('button', { name: /Markdown del patrimonio/ }).click(),
+    ])
+    const mdPatrimonio = readFileSync(await descargaPatrimonio.path(), 'utf8')
+    comprueba.comprueba(
+      mdPatrimonio.includes('Patrimonio neto') && mdPatrimonio.includes('Hipoteca'),
+      'El Markdown del patrimonio lleva las deudas y el neto real',
+    )
+    comprueba.comprueba(
+      mdPatrimonio.includes('no incluyen deuda') || mdPatrimonio.includes('no registraba'),
+      'El Markdown avisa de que las fotos antiguas no incluían deuda',
+    )
+
+    // --- 13. El navegador la considera instalable ----------------------
+    // Se hace en un PERFIL DE VERDAD, no en el contexto de las pruebas: el contexto normal de
+    // Playwright es de incógnito, y Chrome marca "in-incognito" como impedimento para instalar.
+    // Comprobarlo ahí daría un fallo que no es de la app, y darlo por bueno sería peor: la
+    // instalación en el móvil es justamente lo que hay que demostrar.
+    await compruebaInstalabilidad(comprueba, servidor.url)
+
+    // El repaso de errores de consola va AL FINAL, para que cubra también las descargas.
     comprueba.comprueba(errores.length === 0, `Sin errores en consola${errores.length ? `: ${errores[0]}` : ''}`)
   } finally {
     await navegador.close()
@@ -229,6 +319,51 @@ async function main() {
     console.log('')
     console.log('Errores recogidos de la consola del navegador:')
     for (const error of errores.slice(0, 10)) console.log(`  - ${error}`)
+  }
+}
+
+/**
+ * Comprueba que el navegador considera la app INSTALABLE, en un perfil que no sea de incógnito.
+ *
+ * Chrome solo deja instalar una PWA si el manifiesto está bien, hay un service worker con su
+ * manejador de `fetch`, y no está en modo incógnito. Esta comprobación es la que de verdad
+ * respalda la frase «se instala en el móvil»; el manifiesto puede existir y aun así el
+ * navegador negarse.
+ */
+async function compruebaInstalabilidad(comprueba, url) {
+  const perfil = mkdtempSync(join(tmpdir(), 'oikos-perfil-'))
+  let contexto = null
+  try {
+    contexto = await chromium.launchPersistentContext(perfil, {
+      executablePath: rutaChromium(),
+      viewport: MOVIL,
+    })
+    const pagina = contexto.pages()[0] ?? (await contexto.newPage())
+    await pagina.goto(url, { waitUntil: 'domcontentloaded' })
+    await pagina.getByRole('button', { name: '✏️ Apuntar mi primer gasto' }).waitFor({ timeout: 20_000 })
+
+    // El service worker tiene que estar activo: sin él, Chrome tampoco la da por instalable.
+    const estado = await esperaServiceWorkerActivo(pagina)
+
+    const sesion = await contexto.newCDPSession(pagina)
+    const manifiesto = await sesion.send('Page.getAppManifest').catch(() => null)
+    comprueba.comprueba(Boolean(manifiesto?.url), 'El navegador reconoce el manifiesto de la app')
+
+    const instalabilidad = await sesion.send('Page.getInstallabilityErrors').catch(() => null)
+    const fallos = instalabilidad?.installabilityErrors ?? []
+    comprueba.comprueba(
+      fallos.length === 0,
+      `El navegador la considera instalable, sin impedimentos${
+        fallos.length ? `: ${fallos.map((f) => f.errorId).join(', ')}` : ''
+      }`,
+    )
+    comprueba.comprueba(
+      estado?.activo === 'activated',
+      'Y con el service worker activo (condición para instalarla y para el modo sin conexión)',
+    )
+  } finally {
+    if (contexto) await contexto.close()
+    rmSync(perfil, { recursive: true, force: true })
   }
 }
 

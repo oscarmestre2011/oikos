@@ -17,6 +17,7 @@
     "test:smoke": "node scripts/smoke.mjs",
     "test:sw": "node scripts/diagnostico-sw.mjs",
     "test:pages": "node scripts/verify-pages.mjs",
+    "test:live": "node scripts/verify-live.mjs",
     "verify": "npm run typecheck && npm test && npm run build",
     "verify:all": "npm run verify && npm run test:smoke && npm run build:pages && npm run test:pages"
   },
