@@ -107,9 +107,10 @@ export function Presupuestos({ hoy }: PropsPantalla) {
           Deja el campo vacío para no vigilar esa categoría. La media es la de los meses anteriores,
           que sirve de referencia para saber qué tope tiene sentido.
         </p>
-        {gasto.map((categoria) => (
+        {gasto.map((categoria, indice) => (
           <FilaPresupuesto
             key={categoria.nombre}
+            indice={indice}
             categoria={categoria.nombre}
             esencial={categoria.esencial}
             historica={categoria.historica}
@@ -131,6 +132,9 @@ export function Presupuestos({ hoy }: PropsPantalla) {
 }
 
 interface PropsFilaPresupuesto {
+  /** Posicion en la lista. Se usa para el `id` en lugar del nombre de la categoria, que puede
+   *  llevar espacios y tildes ("Deporte y bici") y romper cualquier selector CSS. */
+  indice: number
   categoria: string
   esencial: boolean
   historica: boolean
@@ -146,19 +150,20 @@ interface PropsFilaPresupuesto {
  * de veinte categorias, un boton unico obliga a rellenarlas todas antes de poder guardar
  * ninguna, y eso es justo lo que hace que nadie configure presupuestos.
  */
-function FilaPresupuesto({ categoria, esencial, historica, inicial, media, onGuardar }: PropsFilaPresupuesto) {
+function FilaPresupuesto({ indice, categoria, esencial, historica, inicial, media, onGuardar }: PropsFilaPresupuesto) {
   const [texto, setTexto] = useState(inicial > 0 ? String(inicial).replace('.', ',') : '')
+  const id = `tope-${indice}`
 
   return (
     <div className="campo">
-      <label className="campo__etiqueta" htmlFor={`tope-${categoria}`}>
+      <label className="campo__etiqueta" htmlFor={id}>
         {categoria}
         {esencial && <span className="etiqueta" style={{ marginLeft: 8 }}>esencial</span>}
         {!historica && <span className="etiqueta etiqueta--sugerida" style={{ marginLeft: 6 }}>sugerida</span>}
       </label>
       <div className="en-linea">
         <input
-          id={`tope-${categoria}`}
+          id={id}
           className="entrada"
           inputMode="decimal"
           placeholder="sin tope"

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Aviso } from '../components/Aviso'
 import { Cifra } from '../components/Cifra'
 import { Tarjeta } from '../components/Tarjeta'
@@ -12,7 +12,10 @@ import type { PropsPantalla } from '../navegacion'
 export function Mes({ nav, hoy }: PropsPantalla) {
   const movimientos = useMovimientos()
   const minimoMeses = useAjusteNumero('recurrenteMinimoMeses', 3)
-  const mes = nav.opciones.mes ?? mesDe(hoy)
+  // El mes que se está mirando vive en el estado de ESTA pantalla, no en la pila de navegación.
+  // Si cada flecha apilara una pantalla, después de mirar cinco meses habría que pulsar «atrás»
+  // cinco veces para salir, y el historial del móvil se llenaría de meses.
+  const [mes, setMes] = useState(nav.opciones.mes ?? mesDe(hoy))
 
   const resumen = useMemo(() => resumenMes(movimientos, mes, hoy), [movimientos, mes, hoy])
   const comparativa = useMemo(() => compararConMedia(movimientos, mes, hoy), [movimientos, mes, hoy])
@@ -45,7 +48,7 @@ export function Mes({ nav, hoy }: PropsPantalla) {
           <button
             type="button"
             className="boton boton--pequeno"
-            onClick={() => nav.ir('mes', { mes: mesAnterior(mes) })}
+            onClick={() => setMes(mesAnterior(mes))}
             aria-label="Mes anterior"
           >
             ←
@@ -59,7 +62,7 @@ export function Mes({ nav, hoy }: PropsPantalla) {
           <button
             type="button"
             className="boton boton--pequeno"
-            onClick={() => nav.ir('mes', { mes: mesSiguiente(mes) })}
+            onClick={() => setMes(mesSiguiente(mes))}
             aria-label="Mes siguiente"
             disabled={esMesFuturo(mesSiguiente(mes), hoy)}
           >
@@ -252,6 +255,22 @@ export function Mes({ nav, hoy }: PropsPantalla) {
           : resumen.movimientos.length === 0
             ? `Ver los movimientos de ${nombreMes(mes)}`
             : `Ver los ${resumen.movimientos.length} movimientos de ${nombreMes(mes)}`}
+      </button>
+
+      {/*
+        Este boton es la PuERTA PRINCIPAL a los presupuestos, y no es un adorno: hasta ahora la
+        unica entrada era la tarjeta "Presupuestos que vigilar" de Inicio, que solo se enseña
+        cuando YA hay un presupuesto pasado o casi. O sea que en una instalacion nueva era
+        imposible crear el primero: la pantalla existia y no se podia llegar a ella. Se descubrio
+        al ir a escribir una prueba que creara un presupuesto desde cero.
+      */}
+      <button
+        type="button"
+        className="boton boton--ancho"
+        style={{ marginTop: 10 }}
+        onClick={() => nav.ir('presupuestos')}
+      >
+        🎯 Presupuestos y avisos por categoría
       </button>
 
       {redondea(resumen.inversion + resumen.amortizacion) > 0 && (

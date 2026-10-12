@@ -30,6 +30,42 @@ import type {
 export const CLAVE_SEMILLA = 'versionSemilla'
 
 /**
+ * Ajustes que describen ESTE movil, no los datos: si ya se vio la bienvenida, cuando se hizo la
+ * ultima copia y cada cuanto recordarla.
+ *
+ * Al importar una copia con "reemplazar" NO se pisan con los de la copia. El motivo se descubrio
+ * con una prueba de navegador: al vaciar los ajustes para meter los de la copia, la app se
+ * quedaba un instante sin `versionSemilla` ni `bienvenidaVista`, la pantalla se desmontaba y el
+ * aviso de "Copia restaurada" no llegaba a verse nunca. Es decir: el usuario restauraba una
+ * copia y la app no le decia si habia funcionado. En una operacion de recuperacion, eso es lo
+ * peor que puede pasar.
+ */
+export const AJUSTES_DE_ESTE_EQUIPO = ['versionSemilla', 'bienvenidaVista', 'ultimaCopia', 'copiaCadaDias']
+
+/**
+ * Fusiona unos ajustes de partida con los de este equipo, que son los que ganan.
+ *
+ * Gana el valor local (`propios`) cuando existe, porque es una preferencia de este movil; y si
+ * no existe, se queda el de la copia. Ademas se garantiza que la marca de la semilla (`versionSemilla`)
+ * esté siempre: hay pantallas que la miran para saber si la base está lista, y sin ella se
+ * quedarian cargando para siempre.
+ */
+function fusionaAjustes(base: Ajuste[], propios: Ajuste[]): Ajuste[] {
+  const valoresPropios = new Map(propios.map((a) => [a.clave, a.valor]))
+  const fusionados = base.map((ajuste) =>
+    valoresPropios.has(ajuste.clave) ? { clave: ajuste.clave, valor: valoresPropios.get(ajuste.clave)! } : ajuste,
+  )
+  const clavesBase = new Set(base.map((a) => a.clave))
+  for (const propio of propios) {
+    if (!clavesBase.has(propio.clave)) fusionados.push(propio)
+  }
+  if (!fusionados.some((a) => a.clave === CLAVE_SEMILLA)) {
+    fusionados.push({ clave: CLAVE_SEMILLA, valor: '1' })
+  }
+  return fusionados
+}
+
+/**
  * Mete el historico real la primera vez que se abre la app.
  *
  * Se comprueba la marca `versionSemilla` Y que las tablas esten vacias: si alguien ha
@@ -64,21 +100,34 @@ export async function sembrarSiHaceFalta(): Promise<boolean> {
 /**
  * Vuelve a dejar la app con el historico de partida (borra lo que hubiera).
  *
- * Se conserva el ajuste `bienvenidaVista`: si no, al recargar el historico la app saltaria a la
- * pantalla de bienvenida, que es justo lo que nadie espera al pulsar ese boton.
+ * Se conservan los ajustes de este equipo (`bienvenidaVista` y compañia): si no, al recargar el
+ * historico la app saltaria a la pantalla de bienvenida, que es justo lo que nadie espera al
+ * pulsar ese boton. Y se hace TODO en una sola transaccion: en dos pasos, la app llega a verse
+ * vacia por el camino.
  */
 export async function reiniciarConSemilla(): Promise<void> {
-  const bienvenida = await db.ajustes.get('bienvenidaVista')
-  await borrarTodo(false)
+  const propios = (await db.ajustes.toArray()).filter((a) => AJUSTES_DE_ESTE_EQUIPO.includes(a.clave))
+
   await db.transaction('rw', [db.movimientos, db.categorias, db.cuentas, db.deudas, db.fotos, db.presupuestos, db.ajustes, db.bitcoin], async () => {
+    await Promise.all([
+      db.movimientos.clear(),
+      db.categorias.clear(),
+      db.cuentas.clear(),
+      db.deudas.clear(),
+      db.fotos.clear(),
+      db.presupuestos.clear(),
+      db.bitcoin.clear(),
+      db.ajustes.clear(),
+    ])
     await db.categorias.bulkAdd(CATEGORIAS_SEMILLA)
     await db.cuentas.bulkAdd(CUENTAS_SEMILLA)
     await db.deudas.bulkAdd(DEUDAS_SEMILLA)
     await db.fotos.bulkAdd(FOTOS_SEMILLA)
     await db.movimientos.bulkAdd(MOVIMIENTOS_SEMILLA)
     await db.bitcoin.bulkAdd(COMPRAS_BITCOIN_SEMILLA)
-    await db.ajustes.bulkPut(AJUSTES_SEMILLA)
-    if (bienvenida) await db.ajustes.put(bienvenida)
+    // Los de este equipo van DESPUES para que ganen ellos (por ejemplo, cada cuanto recordar
+    // la copia, que es una preferencia y no un dato).
+    await db.ajustes.bulkPut(fusionaAjustes(AJUSTES_SEMILLA, propios))
   })
 }
 
@@ -385,8 +434,24 @@ export async function importaCopia(
   }
 
   if (modo === 'reemplazar') {
-    await borrarTodo(false)
+    const propios = (await db.ajustes.toArray()).filter((a) => AJUSTES_DE_ESTE_EQUIPO.includes(a.clave))
+
+    // Vaciar y volver a llenar en la MISMA transaccion. En dos pasos (primero `borrarTodo` y
+    // despues meter la copia), la app se quedaba un instante sin datos ni ajustes: enseñaba la
+    // pantalla de carga, desmontaba la pantalla de Ajustes y el aviso de "Copia restaurada" se
+    // perdia por el camino. Una transaccion de IndexedDB es atomica, asi que la app nunca llega
+    // a ver el estado intermedio.
     await db.transaction('rw', [db.movimientos, db.categorias, db.cuentas, db.deudas, db.fotos, db.presupuestos, db.ajustes, db.bitcoin], async () => {
+      await Promise.all([
+        db.movimientos.clear(),
+        db.categorias.clear(),
+        db.cuentas.clear(),
+        db.deudas.clear(),
+        db.fotos.clear(),
+        db.presupuestos.clear(),
+        db.bitcoin.clear(),
+        db.ajustes.clear(),
+      ])
       await db.movimientos.bulkAdd(sinIds(copia.movimientos))
       await db.categorias.bulkAdd(sinIds(copia.categorias))
       await db.cuentas.bulkAdd(sinIds(copia.cuentas))
@@ -394,7 +459,7 @@ export async function importaCopia(
       await db.fotos.bulkAdd(sinIds(copia.fotos))
       await db.presupuestos.bulkAdd(sinIds(copia.presupuestos ?? []))
       await db.bitcoin.bulkAdd(sinIds(copia.bitcoin ?? []))
-      await db.ajustes.bulkPut(copia.ajustes ?? [])
+      await db.ajustes.bulkPut(fusionaAjustes(copia.ajustes ?? [], propios))
     })
     resultado.movimientosAnadidos = copia.movimientos.length
     resultado.fotosAnadidas = copia.fotos.length

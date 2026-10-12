@@ -154,23 +154,30 @@ export function Patrimonio({ hoy, onError }: Props) {
           { titulo: 'Inversiones y activos', lista: activos },
         ].map((bloque) => (
           <Tarjeta key={bloque.titulo} titulo={bloque.titulo}>
-            {bloque.lista.map((cuenta) => (
-              <div className="campo" key={cuenta.nombre}>
-                <label className="campo__etiqueta" htmlFor={`foto-${cuenta.nombre}`}>
-                  {cuenta.nombre}
-                </label>
-                <input
-                  id={`foto-${cuenta.nombre}`}
-                  className="entrada"
-                  type="text"
-                  inputMode="decimal"
-                  value={borrador[cuenta.nombre] ?? ''}
-                  onChange={(evento) =>
-                    setBorrador((anterior) => ({ ...anterior, [cuenta.nombre]: evento.target.value }))
-                  }
-                />
-              </div>
-            ))}
+            {bloque.lista.map((cuenta) => {
+              // El `id` se hace con el numero de cuenta y NO con su nombre: los nombres llevan
+              // espacios, tildes y parentesis ("Cuenta nomina (ING)"), y aunque un `id` asi es
+              // legal en HTML, cualquier selector CSS se rompe con ellos. Se descubrio al
+              // escribir una prueba que intentaba localizar el campo.
+              const indice = cuentasActivas.indexOf(cuenta)
+              return (
+                <div className="campo" key={cuenta.nombre}>
+                  <label className="campo__etiqueta" htmlFor={`foto-cuenta-${indice}`}>
+                    {cuenta.nombre}
+                  </label>
+                  <input
+                    id={`foto-cuenta-${indice}`}
+                    className="entrada"
+                    type="text"
+                    inputMode="decimal"
+                    value={borrador[cuenta.nombre] ?? ''}
+                    onChange={(evento) =>
+                      setBorrador((anterior) => ({ ...anterior, [cuenta.nombre]: evento.target.value }))
+                    }
+                  />
+                </div>
+              )
+            })}
           </Tarjeta>
         ))}
 

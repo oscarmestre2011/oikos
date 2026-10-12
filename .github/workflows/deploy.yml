@@ -42,20 +42,18 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Revisar los tipos
-        run: npm run typecheck
-
-      - name: Pruebas de la logica y de los datos
-        run: npm test
-
-      - name: Compilar para la subcarpeta
-        run: npm run build:pages
-
+      # El navegador hace falta para las pruebas en navegador real y para la de subcarpeta.
       - name: Instalar el navegador de las pruebas
         run: npx playwright install --with-deps chromium
 
-      - name: Comprobar el despliegue en subcarpeta (incluye modo sin conexion)
-        run: npm run test:pages
+      # UN SOLO COMANDO, el mismo que se lanza en el portatil antes de publicar. Es a proposito:
+      # si aqui se escribieran los pasos a mano, lo que se comprueba al publicar y lo que se
+      # comprueba en casa podrian acabar siendo cosas distintas sin que nadie se entere.
+      # Incluye: tipos, 324 pruebas de logica, la app en un navegador real (48 + 23
+      # comprobaciones, incluido el modo sin conexion) y el despliegue en subcarpeta, que es
+      # donde se queda la app en blanco si las rutas estan mal.
+      - name: Todas las comprobaciones
+        run: npm run verify:all
 
       - uses: actions/configure-pages@v5
 

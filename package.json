@@ -15,12 +15,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:smoke": "node scripts/smoke.mjs",
+    "test:flujos": "node scripts/flujos.mjs",
     "test:sw": "node scripts/diagnostico-sw.mjs",
     "test:pages": "node scripts/verify-pages.mjs",
     "test:live": "node scripts/verify-live.mjs",
     "publicar": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publicar.ps1",
     "verify": "npm run typecheck && npm test && npm run build",
-    "verify:all": "npm run verify && npm run test:smoke && npm run build:pages && npm run test:pages"
+    "verify:all": "npm run verify && npm run test:smoke && npm run test:flujos && npm run build:pages && npm run test:pages"
   },
   "dependencies": {
     "dexie": "^4.0.10",

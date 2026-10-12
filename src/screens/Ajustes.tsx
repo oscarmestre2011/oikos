@@ -149,6 +149,17 @@ export function Ajustes({ nav, hoy, onError }: Props) {
         <p className="texto-tenue" style={{ marginBottom: 0 }}>
           Se usan en la pantalla de Inicio para ver si cumples el plan. Ponlos a 0 para no verlos.
         </p>
+
+        {/* Segunda puerta a los presupuestos, por si se busca desde Ajustes (que es donde estan
+            los demas topes y objetivos). */}
+        <button
+          type="button"
+          className="boton boton--ancho"
+          style={{ marginTop: 12 }}
+          onClick={() => nav.ir('presupuestos')}
+        >
+          🎯 Presupuestos por categoría
+        </button>
       </Tarjeta>
 
       <Tarjeta titulo="Copia de seguridad">
