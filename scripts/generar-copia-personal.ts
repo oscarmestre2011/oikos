@@ -65,9 +65,9 @@ interface Historico {
 /**
  * Traduce el tipo del CSV a los cuatro tipos de Oikos.
  *
- * En el CSV original la misma idea estaba escrita de tres maneras (`Gasto,Inversión` para Mintos
- * y Bitcoin, que no son gastos). Manda la CATEGORIA antes que la columna Tipo, porque es la
- * categoria la que dice de verdad a qué se destina el dinero.
+ * En el CSV original la misma idea estaba escrita de tres maneras (unas aportaciones a inversión
+ * venian marcadas como `Gasto`, cuando no lo son). Manda la CATEGORIA antes que la columna Tipo,
+ * porque es la categoria la que dice de verdad a qué se destina el dinero.
  */
 function tipoDe(movimiento: { tipo: string; categoria: string }): Movimiento['tipo'] {
   const limpiar = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
