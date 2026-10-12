@@ -63,14 +63,24 @@ Write-Host 'Todo correcto.' -ForegroundColor Green
 # --- 3. Subir ---------------------------------------------------------------
 Titulo 'Subiendo a GitHub'
 
-$remoto = & git remote get-url origin 2>$null
-if (-not $remoto) {
+# Se usa `git remote` (que lista y no falla nunca) en lugar de `git remote get-url origin`:
+# ese ultimo escribe en la salida de ERROR cuando el remoto no existe, y con
+# `$ErrorActionPreference = 'Stop'` PowerShell 5.1 lo convierte en un error que corta el script
+# antes de poder explicar nada. Se descubrio ejecutando el script, no leyendolo.
+$remotos = @(& git remote)
+if ($remotos -notcontains 'origin') {
     Write-Host "Configurando el remoto: $urlRemoto"
     & git remote add origin $urlRemoto
 }
 
+# La subida SI puede fallar (es lo normal la primera vez, si el repositorio aun no existe), asi
+# que aqui se deja que el error no corte el script: interesa leer el mensaje y explicarlo.
+$preferenciaAnterior = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 $respuesta = & git push -u origin main 2>&1
 $codigo = $LASTEXITCODE
+$ErrorActionPreference = $preferenciaAnterior
+
 $respuesta | ForEach-Object { Write-Host $_ }
 
 if ($codigo -ne 0) {
