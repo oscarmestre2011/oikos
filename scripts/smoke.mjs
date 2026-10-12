@@ -339,6 +339,29 @@ async function main() {
     // instalación en el móvil es justamente lo que hay que demostrar.
     await compruebaInstalabilidad(comprueba, servidor.url)
 
+    // --- 14. En una pantalla estrecha no se sale nada de sitio ----------
+    // Que algo sea más ancho que la pantalla hace aparecer una barra horizontal y se ve fatal en
+    // un móvil: es un fallo facil de colar y muy facil de no ver si solo se prueba en una
+    // pantalla. Aqui se prueba a 360 px, mas estrecho que el Pixel 7 de las demas pruebas.
+    await pagina.setViewportSize({ width: 360, height: 640 })
+    const desbordes = []
+    for (const nombre of ['Inicio', 'Apuntar', 'El mes', 'Patrimonio', 'Ajustes']) {
+      await pagina.getByRole('button', { name: nombre, exact: true }).click()
+      await pagina.waitForTimeout(250)
+      const anchos = await pagina.evaluate(() => ({
+        documento: document.documentElement.scrollWidth,
+        ventana: document.documentElement.clientWidth,
+      }))
+      if (anchos.documento > anchos.ventana + 1) {
+        desbordes.push(`${nombre} (${anchos.documento} > ${anchos.ventana})`)
+      }
+      await captura(`08-estrecho-${nombre.toLowerCase().replace(/\s+/g, '-')}`)
+    }
+    comprueba.comprueba(
+      desbordes.length === 0,
+      `Ninguna pantalla se desborda a lo ancho en 360 px${desbordes.length ? `: ${desbordes.join(', ')}` : ''}`,
+    )
+
     // El repaso de errores de consola va AL FINAL, para que cubra también las descargas.
     comprueba.comprueba(errores.length === 0, `Sin errores en consola${errores.length ? `: ${errores[0]}` : ''}`)
   } finally {

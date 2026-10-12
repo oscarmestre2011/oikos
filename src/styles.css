@@ -286,6 +286,14 @@ textarea {
   background: var(--superficie-alta);
   border-radius: var(--radio-pequeno);
   padding: 10px 12px;
+  /*
+   * `min-width: 0` es imprescindible, y su falta costo un desbordamiento real: los elementos de
+   * una rejilla tienen `min-width: auto` por defecto, asi que un numero de dinero largo (que no
+   * se puede partir, porque los separadores de millar son espacios duros) ensancha su columna
+   * por encima de lo que cabe y la pantalla entera se sale de sitio. Lo detecto la comprobacion
+   * de 360 px de ancho de la prueba de humo.
+   */
+  min-width: 0;
 }
 
 /* ---------------------------------------------------------------- Botones */
@@ -741,6 +749,32 @@ textarea {
   place-items: center;
   min-height: 60dvh;
   color: var(--texto-suave);
+}
+
+/*
+ * Moviles estrechos (360 px o menos: un iPhone SE, un Android pequeño).
+ *
+ * Con tres columnas de cifras en euros no se cabe: "41.336,40 EUR" no se puede partir por la
+ * mitad (lleva espacios duros) y acababa empujando la pantalla a lo ancho. Se pasa a dos
+ * columnas y se reduce un poco el tamaño de las cifras, que es lo que se hace en cualquier
+ * app cuando el numero no cabe. Lo comprueba la prueba de humo midiendo el ancho real.
+ */
+@media (max-width: 400px) {
+  .rejilla--3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cifra {
+    font-size: 1.7rem;
+  }
+
+  .cifra--mediana {
+    font-size: 1.2rem;
+  }
+
+  .cifra--pequena {
+    font-size: 0.95rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
