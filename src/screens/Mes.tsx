@@ -224,7 +224,11 @@ export function Mes({ nav, hoy }: PropsPantalla) {
         className="boton boton--ancho"
         onClick={() => nav.ir('movimientos', { mes })}
       >
-        Ver los {resumen.movimientos.length} movimientos de {nombreMes(mes)}
+        {resumen.movimientos.length === 1
+          ? `Ver el movimiento de ${nombreMes(mes)}`
+          : resumen.movimientos.length === 0
+            ? `Ver los movimientos de ${nombreMes(mes)}`
+            : `Ver los ${resumen.movimientos.length} movimientos de ${nombreMes(mes)}`}
       </button>
 
       {redondea(resumen.inversion + resumen.amortizacion) > 0 && (

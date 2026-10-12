@@ -121,7 +121,8 @@ async function main() {
 
     // --- 5. Los movimientos del histórico están ------------------------
     // Movimientos no es una pestaña: se entra desde El mes (o desde Inicio).
-    await pagina.getByRole('button', { name: /Ver los \d+ movimientos/ }).click()
+    // El texto del botón cambia en singular y en plural, así que se busca por la parte común.
+    await pagina.getByRole('button', { name: /Ver (el|los) .*movimiento/ }).click()
     await pagina.getByPlaceholder('Buscar por concepto o categoría').waitFor({ timeout: 10_000 })
     comprueba.comprueba(true, 'Se entra al listado de movimientos desde El mes')
 
