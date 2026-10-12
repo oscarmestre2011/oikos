@@ -161,9 +161,41 @@ async function main() {
 
     // Se vuelve a Inicio con el botón de la barra de abajo.
     await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
+    await pagina.getByText('Gastado este mes').waitFor({ timeout: 10_000 })
+
+    // El retroceso tiene que volver a la pantalla anterior, no salir de la app.
+    //
+    // Se comprueba aquí, con Movimientos, porque es una pantalla que SE APILA (`ir`). Las
+    // pestañas de abajo usan `irARaiz`, que a propósito NO crea historial (volver a una pestaña
+    // reinicia la navegación): comprobarlo con una de ellas daría un fallo que no es real.
+    //
+    // Y se usa `history.back()` dentro de la página y NO `page.goBack()`: el de Playwright espera
+    // el suceso de carga de una navegación normal, y las navegaciones internas de una SPA (las
+    // que crea `pushState`) no lo disparan. `history.back()` es exactamente lo que hace el botón
+    // atrás del navegador y el gesto del móvil.
+    await pagina.getByRole('button', { name: 'El mes', exact: true }).click()
+    await pagina.getByText('En qué se ha ido').waitFor({ timeout: 10_000 })
+    await pagina.getByRole('button', { name: /Ver (el|los) .*movimiento/ }).click()
+    await pagina.getByPlaceholder('Buscar por concepto o categoría').waitFor({ timeout: 10_000 })
+
+    await pagina.evaluate(() => window.history.back())
+    await pagina.waitForTimeout(600)
+    const trasAtras = await pagina.locator('body').innerText()
+    // Se compara en mayúsculas porque el título de la tarjeta va en mayúsculas por CSS y
+    // `innerText` devuelve el texto tal y como se ve.
+    const volvioAlMes = trasAtras.toUpperCase().includes('EN QUÉ SE HA IDO')
+    comprueba.comprueba(
+      volvioAlMes,
+      'El botón atrás vuelve a la pantalla anterior en lugar de salir de la app' +
+        (volvioAlMes ? '' : ` — se ve: «${trasAtras.slice(0, 70).replace(/\n/g, ' ')}» · url: ${pagina.url()}`),
+    )
+
+    await pagina.getByRole('button', { name: 'Inicio', exact: true }).click()
+    await pagina.getByText('Gastado este mes').waitFor({ timeout: 10_000 })
 
     // --- 6. El patrimonio resta la deuda -------------------------------
-    await pagina.getByRole('button', { name: 'Patrimonio', exact: true }).click()
+    // Se entra con el enlace de la tarjeta de Inicio, que es una navegación de pestaña.
+    await pagina.getByRole('button', { name: 'Ver detalle' }).click()
     await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
     const textoPatrimonio = await pagina.locator('body').innerText()
     comprueba.comprueba(

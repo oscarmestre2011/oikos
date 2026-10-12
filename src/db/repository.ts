@@ -61,8 +61,14 @@ export async function sembrarSiHaceFalta(): Promise<boolean> {
   return true
 }
 
-/** Vuelve a dejar la app con el historico de partida (borra lo que hubiera). */
+/**
+ * Vuelve a dejar la app con el historico de partida (borra lo que hubiera).
+ *
+ * Se conserva el ajuste `bienvenidaVista`: si no, al recargar el historico la app saltaria a la
+ * pantalla de bienvenida, que es justo lo que nadie espera al pulsar ese boton.
+ */
 export async function reiniciarConSemilla(): Promise<void> {
+  const bienvenida = await db.ajustes.get('bienvenidaVista')
   await borrarTodo(false)
   await db.transaction('rw', [db.movimientos, db.categorias, db.cuentas, db.deudas, db.fotos, db.presupuestos, db.ajustes, db.bitcoin], async () => {
     await db.categorias.bulkAdd(CATEGORIAS_SEMILLA)
@@ -72,6 +78,7 @@ export async function reiniciarConSemilla(): Promise<void> {
     await db.movimientos.bulkAdd(MOVIMIENTOS_SEMILLA)
     await db.bitcoin.bulkAdd(COMPRAS_BITCOIN_SEMILLA)
     await db.ajustes.bulkPut(AJUSTES_SEMILLA)
+    if (bienvenida) await db.ajustes.put(bienvenida)
   })
 }
 

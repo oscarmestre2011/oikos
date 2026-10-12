@@ -43,20 +43,31 @@ export function App() {
   const actual = pila[pila.length - 1]
 
   const ir = useCallback((pantalla: Pantalla, opciones: OpcionesNavegacion = {}) => {
+    // Cada pantalla que se apila añade una entrada al HISTORIAL del navegador. Sin esto, el
+    // gesto de retroceso del móvil (o el botón atrás) sacaría al usuario de la app en lugar de
+    // volver a la pantalla anterior. El `pushState` va AQUÍ y no dentro del `setPila`: React en
+    // modo estricto ejecuta dos veces las funciones de actualización, y se duplicarían entradas.
+    window.history.pushState({ oikos: pantalla }, '')
     setPila((anterior) => [...anterior, { pantalla, opciones }])
   }, [])
 
   const volver = useCallback(() => {
-    setPila((anterior) => (anterior.length > 1 ? anterior.slice(0, -1) : anterior))
+    // Se apoya en el historial (`back`) para que la pila y el historial no se separen: si se
+    // cambiara la pila por un lado y el historial por otro, el botón atrás acabaría sacando de
+    // la app. Si no hay ninguna entrada nuestra (primera pantalla), se hace a mano.
+    if (window.history.state?.oikos) window.history.back()
+    else setPila((anterior) => (anterior.length > 1 ? anterior.slice(0, -1) : anterior))
   }, [])
 
   const irARaiz = useCallback((pantalla: Pantalla) => {
+    // `replaceState` y no `pushState`: volver a una pestaña reinicia la pila a un solo elemento,
+    // así que el historial tampoco debe crecer.
+    window.history.replaceState({ oikos: pantalla }, '')
     setPila([{ pantalla, opciones: {} }])
   }, [])
 
-  // El historial del navegador se usa para el boton "atras" del movil: sin esto, el gesto
-  // de retroceso sacaria al usuario de la app en lugar de volver a la pantalla anterior.
   useEffect(() => {
+    // El gesto de retroceso del móvil y el botón atrás del navegador llegan aquí.
     const alRetroceder = () => {
       setPila((anterior) => (anterior.length > 1 ? anterior.slice(0, -1) : anterior))
     }
