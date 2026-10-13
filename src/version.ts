@@ -8,7 +8,7 @@
  * tienen la app instalada seguirian con la copia vieja en caché.
  */
 
-export const VERSION = '1.2.0'
+export const VERSION = '1.2.1'
 
 export const FECHA_VERSION = '2026-10-13'
 
@@ -25,6 +25,23 @@ export interface Nota {
 }
 
 export const NOVEDADES: Nota[] = [
+  {
+    version: '1.2.1',
+    fecha: FECHA_VERSION,
+    titulo: 'Las deudas, con las cuentas claras',
+    cambios: [
+      {
+        tipo: 'mejorado',
+        texto:
+          'La tarjeta de deudas enseña el desglose: lo que se resta del patrimonio, lo que se debe pero paga otra persona, y el total apuntado. Antes sumabas la lista de deudas y no cuadraba con el número grande, porque la compartida no se resta, y la app no lo explicaba.',
+      },
+      {
+        tipo: 'mejorado',
+        texto:
+          'La etiqueta «compartida» ya no desaparece cuando el nombre de la deuda es largo: iba dentro del título, que se corta con puntos suspensivos, y se perdía justo la etiqueta que explica por qué esa deuda no suma en el total.',
+      },
+    ],
+  },
   {
     version: '1.2.0',
     fecha: FECHA_VERSION,

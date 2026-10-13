@@ -37,6 +37,10 @@ export function Patrimonio({ hoy, onError }: Props) {
     [fotoActual, cuentas, deudas],
   )
   const deudaTotal = useMemo(() => totalDeuda(deudas), [deudas])
+
+  /** Cuántas deudas hay de cada clase, para poder decirlo en la tarjeta del total. */
+  const deudasActivas = deudas.filter((d) => d.activa).length
+  const deudasPropias = deudas.filter((d) => d.activa && !d.compartida).length
   const ultimos = useMemo(() => ultimosValores(fotos), [fotos])
 
   const cuentasActivas = cuentas.filter((c) => c.activa)
@@ -218,11 +222,38 @@ export function Patrimonio({ hoy, onError }: Props) {
     <>
         <Tarjeta titulo="Mis deudas">
           <Cifra valor={formateaImporte(deudaTotal.propia)} etiqueta="Deuda propia" tono="negativa" />
+          {/*
+            El desglose tiene que verse, y no es un detalle: el numero grande NO es la suma de todo
+            lo de la lista de abajo. La deuda compartida (la que paga otra persona, aunque el riesgo
+            sea tuyo) no se resta del patrimonio. Sin decirlo, la lista parece no cuadrar, y con
+            razon: sumando las cuatro deudas sale mas que el total. Paso de verdad.
+          */}
+          <p className="texto-suave" style={{ marginBottom: 0 }}>
+            Es la que se resta del patrimonio: {deudasPropias}{' '}
+            {deudasPropias === 1 ? 'deuda' : 'deudas'} de la lista de abajo.
+          </p>
           {deudaTotal.compartida > 0 && (
-            <p className="texto-suave" style={{ marginBottom: 0 }}>
-              Además hay {formateaImporte(deudaTotal.compartida)} de deuda compartida (la paga otra
-              persona, pero el riesgo es tuyo). No entra en el neto.
-            </p>
+            <>
+              <div className="separador" />
+              <div className="reparte">
+                <span className="fila__principal">
+                  <span className="fila__titulo">Deuda compartida</span>
+                  <span className="fila__detalle">
+                    No se resta: la paga otra persona, aunque el riesgo es tuyo
+                  </span>
+                </span>
+                <span className="fila__importe">{formateaImporte(deudaTotal.compartida)}</span>
+              </div>
+              <div className="reparte">
+                <span className="fila__principal">
+                  <span className="fila__titulo">Total apuntado</span>
+                  <span className="fila__detalle">
+                    Las {deudasActivas} deudas de la lista, sumadas
+                  </span>
+                </span>
+                <span className="fila__importe">{formateaImporte(deudaTotal.total)}</span>
+              </div>
+            </>
           )}
         </Tarjeta>
 
@@ -248,22 +279,33 @@ export function Patrimonio({ hoy, onError }: Props) {
             <Tarjeta key={deuda.id}>
               <div className="reparte">
                 <span className="fila__principal">
-                  <span className="fila__titulo">
-                    {deuda.nombre} {deuda.compartida && <span className="etiqueta">compartida</span>}
-                    {/*
-                      Un saldo de hace mas de mes y medio suele estar mal: las hipotecas bajan todos
-                      los meses y los prestamos se amortizan. Se avisa en vez de dar por bueno un
-                      numero viejo, que es lo que hacia la hoja de calculo.
-                    */}
-                    {deuda.activa && diferenciaDias(deuda.fechaSaldo, hoy) > 45 && (
-                      <span className="etiqueta">saldo antiguo</span>
-                    )}
-                  </span>
+                  <span className="fila__titulo">{deuda.nombre}</span>
                   <span className="fila__detalle">
                     saldo a {formateaFechaCorta(deuda.fechaSaldo)}
                     {deuda.interes ? ` · ${deuda.interes} %` : ''}
                     {deuda.vence ? ` · vence ${formateaFechaCorta(deuda.vence)}` : ''}
                   </span>
+                  {/*
+                    Las etiquetas van en su propia linea, y NO dentro del titulo: el titulo se corta
+                    con puntos suspensivos cuando el nombre es largo ("Préstamo solidario
+                    (Bankinter)..."), y la etiqueta "compartida" desaparecia con el. Justo la que
+                    explica por que esa deuda no suma en el total.
+                  */}
+                  {deuda.compartida && (
+                    <span className="fila__detalle">
+                      <span className="etiqueta">compartida</span>
+                    </span>
+                  )}
+                  {/*
+                    Un saldo de hace mas de mes y medio suele estar mal: las hipotecas bajan todos
+                    los meses y los prestamos se amortizan. Se avisa en vez de dar por bueno un
+                    numero viejo, que es lo que hacia la hoja de calculo.
+                  */}
+                  {deuda.activa && diferenciaDias(deuda.fechaSaldo, hoy) > 45 && (
+                    <span className="fila__detalle">
+                      <span className="etiqueta">saldo antiguo</span>
+                    </span>
+                  )}
                 </span>
                 <span className="fila__importe fila__importe--gasto">{formateaImporte(deuda.saldo)}</span>
               </div>

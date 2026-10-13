@@ -62,6 +62,9 @@ const DEUDA_SALDO = '5000'
 const DEUDA_SALDO_CORREGIDO = '80000'
 const DEUDA_TEMPORAL = 'Deuda temporal'
 const DEUDA_TEMPORAL_SALDO = '500'
+/** Una deuda que paga otra persona: se enseña, pero NO se resta del patrimonio. */
+const DEUDA_COMPARTIDA = 'Prestamo compartido de prueba'
+const DEUDA_COMPARTIDA_SALDO = '1000'
 
 async function main() {
   if (!existsSync(join(DIST, 'index.html'))) {
@@ -176,6 +179,32 @@ async function main() {
           return (cifra?.textContent ?? '').replace(/\s/g, '') === buscado
         },
         [textoDeLaTarjeta, esperado.replace(/\s/g, '')],
+        { timeout: limiteMs },
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * El importe de una fila concreta, buscándola por el texto de su título.
+   *
+   * No sirve `cifraDeLaTarjeta` para esto: esa devuelve la primera cifra grande de la tarjeta, que
+   * en "Mis deudas" es el total de la deuda propia y no la fila que se quiere comprobar.
+   */
+  const filaDeLaTarjeta = async (tituloDeLaFila, esperado, limiteMs = 5_000) => {
+    try {
+      await pagina.waitForFunction(
+        ([titulo, buscado]) => {
+          const filas = [...document.querySelectorAll('.reparte')]
+          const fila = filas.find(
+            (f) => (f.querySelector('.fila__titulo')?.textContent ?? '').trim() === titulo,
+          )
+          if (!fila) return false
+          return (fila.querySelector('.fila__importe')?.textContent ?? '').replace(/\s/g, '') === buscado
+        },
+        [tituloDeLaFila, esperado.replace(/\s/g, '')],
         { timeout: limiteMs },
       )
       return true
@@ -491,6 +520,38 @@ async function main() {
     comprueba.comprueba(
       await cifraDeLaTarjeta('Deuda propia', '0,00 €'),
       'Una deuda pagada deja de contar en el total',
+    )
+
+    // --- Una deuda compartida NO se resta, pero SÍ aparece en el total apuntado ---
+    // Esto sale de una duda real: «las deudas no se suman». La app sumaba bien (la compartida no
+    // se resta del patrimonio, a propósito), pero la pantalla no lo decía y la lista parecía no
+    // cuadrar: sumando todas las deudas salía más que el número grande. Ahora la tarjeta enseña el
+    // desglose, y aquí se comprueba que los tres números son coherentes entre sí.
+    await pagina.getByRole('button', { name: '+ Añadir una deuda' }).click()
+    await pagina.getByLabel('Nombre').fill(DEUDA_COMPARTIDA)
+    await pagina.getByLabel('Capital pendiente').fill(DEUDA_COMPARTIDA_SALDO)
+    await pagina.getByRole('checkbox', { name: /La paga otra persona/ }).check()
+    await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
+
+    const tarjetaCompartida = pagina.locator('.tarjeta').filter({ hasText: DEUDA_COMPARTIDA })
+    comprueba.comprueba(
+      (await tarjetaCompartida.innerText()).includes('compartida'),
+      'Una deuda compartida se distingue en su propia tarjeta',
+    )
+    // OJO con el formato: en español los números de CUATRO cifras se escriben sin punto de millar
+    // («1000,00 €», no «1.000,00 €»). Lo hace así el formateador de la app, y estuvo a punto de
+    // parecer un fallo de la app cuando era de la prueba.
+    comprueba.comprueba(
+      await filaDeLaTarjeta('Deuda compartida', '1000,00 €'),
+      'El desglose enseña aparte lo que se debe y paga otra persona',
+    )
+    comprueba.comprueba(
+      await filaDeLaTarjeta('Total apuntado', '1000,00 €'),
+      'El total apuntado SÍ suma la compartida (la propia está a cero: se marcó como pagada)',
+    )
+    comprueba.comprueba(
+      await cifraDeLaTarjeta('Deuda propia', '0,00 €'),
+      'Pero la deuda propia, la que se resta del patrimonio, no la incluye',
     )
 
     // --- Añadir una deuda y borrarla ---
