@@ -303,8 +303,8 @@ async function main() {
     await pagina.getByRole('button', { name: 'Guardar la foto' }).click()
     await pagina.getByText('Fotos guardadas').waitFor({ timeout: 10_000 })
 
-    // Y se apunta su propia deuda (el nombre es inventado: no es la de nadie).
-    await pagina.getByRole('button', { name: 'Añadir mis deudas' }).click()
+    // Y se apunta su propia deuda (el nombre es inventado: no es la de nadie). La tarjeta de las
+    // deudas sale ya en esta misma pantalla, así que no hay que entrar en ningún sitio.
     await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })
     await pagina.getByRole('button', { name: '+ Añadir una deuda' }).click()
     await pagina.getByLabel('Nombre').fill(DEUDA_NOMBRE)
@@ -312,8 +312,6 @@ async function main() {
     await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
     const deudaListada = await aparece(DEUDA_NOMBRE, 10_000)
 
-    await pagina.getByRole('button', { name: 'Volver', exact: true }).click()
-    await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
     // 2000 + 100 de cuentas, menos 5000 de deuda: el neto tiene que salir negativo.
     const netoNegativo = await aparece('-2900,00')
     comprueba.comprueba(

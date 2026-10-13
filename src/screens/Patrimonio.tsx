@@ -6,7 +6,7 @@ import { Tarjeta } from '../components/Tarjeta'
 import { borraDeuda, borraFoto, guardaDeuda, guardaFoto } from '../db/repository'
 import { useComprasBitcoin, useCuentas, useDeudas, useFotos } from '../hooks'
 import { formateaCompacto, formateaImporte, parseaImporte, redondea } from '../lib/dinero'
-import { formateaFecha, formateaFechaCorta, nombreMesCorto, mesDe } from '../lib/fechas'
+import { diferenciaDias, formateaFecha, formateaFechaCorta, nombreMesCorto, mesDe } from '../lib/fechas'
 import { calculaPatrimonio, seriePatrimonio, totalDeuda, ultimaFoto, ultimosValores, valorEn } from '../lib/patrimonio'
 import type { PropsPantalla } from '../navegacion'
 import type { Deuda, FotoPatrimonio, ValorCuenta } from '../types'
@@ -15,7 +15,7 @@ interface Props extends PropsPantalla {
   onError: (mensaje: string) => void
 }
 
-type Modo = 'ver' | 'foto' | 'deudas'
+type Modo = 'ver' | 'foto'
 
 export function Patrimonio({ hoy, onError }: Props) {
   const cuentas = useCuentas()
@@ -206,10 +206,16 @@ export function Patrimonio({ hoy, onError }: Props) {
     )
   }
 
-  // -------------------------------------------------------------- Modo deudas
-  if (modo === 'deudas') {
-    return (
-      <div>
+  /**
+   * Las deudas, como una seccion mas de Patrimonio y NO como una pantalla aparte.
+   *
+   * Estaban detras de un boton ("Revisar las deudas") y no se encontraban, con razon: son algo que
+   * se toca todos los meses (la hipoteca baja sola, y los prestamos se amortizan y desaparecen) y
+   * estaban a dos toques de distancia y sin ninguna pista de por donde se entraba. Ahora se ven al
+   * abrir Patrimonio, cada una con su boton de editar.
+   */
+  const seccionDeDeudas = () => (
+    <>
         <Tarjeta titulo="Mis deudas">
           <Cifra valor={formateaImporte(deudaTotal.propia)} etiqueta="Deuda propia" tono="negativa" />
           {deudaTotal.compartida > 0 && (
@@ -244,6 +250,14 @@ export function Patrimonio({ hoy, onError }: Props) {
                 <span className="fila__principal">
                   <span className="fila__titulo">
                     {deuda.nombre} {deuda.compartida && <span className="etiqueta">compartida</span>}
+                    {/*
+                      Un saldo de hace mas de mes y medio suele estar mal: las hipotecas bajan todos
+                      los meses y los prestamos se amortizan. Se avisa en vez de dar por bueno un
+                      numero viejo, que es lo que hacia la hoja de calculo.
+                    */}
+                    {deuda.activa && diferenciaDias(deuda.fechaSaldo, hoy) > 45 && (
+                      <span className="etiqueta">saldo antiguo</span>
+                    )}
                   </span>
                   <span className="fila__detalle">
                     saldo a {formateaFechaCorta(deuda.fechaSaldo)}
@@ -304,18 +318,8 @@ export function Patrimonio({ hoy, onError }: Props) {
             + Añadir una deuda
           </button>
         )}
-
-        <button
-          type="button"
-          className="boton boton--ancho"
-          style={{ marginTop: 10 }}
-          onClick={() => setModo('ver')}
-        >
-          Volver
-        </button>
-      </div>
-    )
-  }
+    </>
+  )
 
   // ------------------------------------------------------------------ Modo ver
   const primera = serie[0]
@@ -360,19 +364,27 @@ export function Patrimonio({ hoy, onError }: Props) {
           <strong>Todavía no has apuntado ninguna deuda.</strong> Sin ellas, el neto que ves arriba es en
           realidad lo que tienes, sin restar lo que debes: justo el número engañoso que daba el Excel.
           Añade la hipoteca, los préstamos y las tarjetas, con su saldo, y el patrimonio dirá la verdad.{' '}
-          <button type="button" className="tarjeta__accion" onClick={() => setModo('deudas')}>
+          <button
+            type="button"
+            className="tarjeta__accion"
+            onClick={() => {
+              setConfirmarBorrado(null)
+              setDeudaEnEdicion('nueva')
+            }}
+          >
             Añadir mis deudas
           </button>
         </Aviso>
       ) : (
         <Aviso tono="info">
-          Las deudas que tienes apuntadas son <strong>{deudas.filter((d) => d.activa).length}</strong>.
-          Compruébalas de vez en cuando: si el saldo de la hipoteca ha bajado, el neto cambia.{' '}
-          <button type="button" className="tarjeta__accion" onClick={() => setModo('deudas')}>
-            Revisar las deudas
-          </button>
+          Tienes <strong>{deudas.filter((d) => d.activa).length}</strong>{' '}
+          {deudas.filter((d) => d.activa).length === 1 ? 'deuda apuntada' : 'deudas apuntadas'}, aquí
+          abajo. Actualízalas cuando amortices: cada vez que cambia un saldo, el patrimonio neto cambia
+          con él.
         </Aviso>
       )}
+
+      {seccionDeDeudas()}
 
       <Tarjeta
         titulo="Evolución"
@@ -415,15 +427,7 @@ export function Patrimonio({ hoy, onError }: Props) {
         )}
       </Tarjeta>
 
-      <Tarjeta
-        titulo="Mis cuentas"
-        sinRelleno
-        accion={
-          <button type="button" className="tarjeta__accion" onClick={() => setModo('deudas')}>
-            Deudas
-          </button>
-        }
-      >
+      <Tarjeta titulo="Mis cuentas" sinRelleno>
         {[
           { titulo: 'Liquidez', lista: liquidez },
           { titulo: 'Inversiones', lista: activos },

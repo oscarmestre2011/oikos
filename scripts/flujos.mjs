@@ -158,6 +158,32 @@ async function main() {
     }
   }
 
+  /**
+   * La cifra grande de una tarjeta concreta, identificada por un texto que lleve dentro.
+   *
+   * Hace falta desde que las deudas se ven en la propia pantalla de Patrimonio: ahí ya no hay una
+   * sola cifra grande, sino varias a la vez (el patrimonio neto y el total de la deuda propia),
+   * así que "la primera del documento" ya no distingue una de otra.
+   */
+  const cifraDeLaTarjeta = async (textoDeLaTarjeta, esperado, limiteMs = 5_000) => {
+    try {
+      await pagina.waitForFunction(
+        ([titulo, buscado]) => {
+          const tarjetas = [...document.querySelectorAll('.tarjeta')]
+          const tarjeta = tarjetas.find((t) => (t.textContent ?? '').includes(titulo))
+          if (!tarjeta) return false
+          const cifra = tarjeta.querySelector('.cifra')
+          return (cifra?.textContent ?? '').replace(/\s/g, '') === buscado
+        },
+        [textoDeLaTarjeta, esperado.replace(/\s/g, '')],
+        { timeout: limiteMs },
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
+
   /** El campo de concepto de Apuntar, sin depender del texto de su marcador. */
   const campoConcepto = () =>
     pagina.locator('.tarjeta').filter({ hasText: 'Concepto' }).getByRole('textbox').first()
@@ -346,7 +372,7 @@ async function main() {
     // verdad que comprobar, en lugar de dar por hecho que existía la hipoteca de nadie.
     await pagina.getByRole('button', { name: 'Patrimonio', exact: true }).click()
     await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
-    await pagina.getByRole('button', { name: 'Añadir mis deudas' }).click()
+    // Las deudas se ven ya en esta misma pantalla: no hay que entrar en ningún sitio.
     await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })
     await pagina.getByRole('button', { name: '+ Añadir una deuda' }).click()
     await pagina.getByLabel('Nombre').fill(DEUDA)
@@ -435,10 +461,11 @@ async function main() {
     await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
     const netoAntesDeLasDeudas = await pagina.locator('.cifra').first().innerText()
 
-    await pagina.getByRole('button', { name: 'Revisar las deudas' }).click()
+    // La tarjeta "Mis deudas" está en la propia pantalla, sin entrar en ningún sitio: eso es
+    // justo lo que se arregló (antes había que encontrar un botón para llegar a ella).
     await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })
     comprueba.comprueba(
-      await cifraPrincipal('5000,00 €'),
+      await cifraDeLaTarjeta('Deuda propia', '5000,00 €'),
       'La deuda propia es la que ha apuntado la prueba (5000,00 €)',
     )
 
@@ -454,7 +481,7 @@ async function main() {
     await campoSaldo.fill(DEUDA_SALDO_CORREGIDO)
     await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
     comprueba.comprueba(
-      await cifraPrincipal('80.000,00 €'),
+      await cifraDeLaTarjeta('Deuda propia', '80.000,00 €'),
       'Al corregir el saldo de la deuda, el total se recalcula',
     )
 
@@ -462,7 +489,7 @@ async function main() {
     const tarjetaDeudaPagada = pagina.locator('.tarjeta').filter({ hasText: DEUDA })
     await tarjetaDeudaPagada.getByRole('button', { name: 'Marcar como pagada' }).click()
     comprueba.comprueba(
-      await cifraPrincipal('0,00 €'),
+      await cifraDeLaTarjeta('Deuda propia', '0,00 €'),
       'Una deuda pagada deja de contar en el total',
     )
 
@@ -472,7 +499,7 @@ async function main() {
     await pagina.getByLabel('Capital pendiente').fill(DEUDA_TEMPORAL_SALDO)
     await pagina.getByRole('button', { name: 'Guardar', exact: true }).click()
     comprueba.comprueba(
-      await cifraPrincipal('500,00 €'),
+      await cifraDeLaTarjeta('Deuda propia', '500,00 €'),
       'Una deuda nueva entra en el total',
     )
 
@@ -485,8 +512,6 @@ async function main() {
       'Borrar una deuda pide confirmación y la quita',
     )
 
-    await pagina.getByRole('button', { name: 'Volver', exact: true }).click()
-    await pagina.getByText('Patrimonio neto', { exact: false }).first().waitFor({ timeout: 10_000 })
     comprueba.comprueba(
       (await pagina.locator('.cifra').first().innerText()) !== netoAntesDeLasDeudas,
       'El patrimonio neto cambia al corregir las deudas',

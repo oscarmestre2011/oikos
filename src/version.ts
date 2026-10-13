@@ -8,9 +8,9 @@
  * tienen la app instalada seguirian con la copia vieja en caché.
  */
 
-export const VERSION = '1.1.0'
+export const VERSION = '1.2.0'
 
-export const FECHA_VERSION = '2026-10-12'
+export const FECHA_VERSION = '2026-10-13'
 
 export interface Cambio {
   tipo: 'nuevo' | 'mejorado' | 'arreglado'
@@ -25,6 +25,28 @@ export interface Nota {
 }
 
 export const NOVEDADES: Nota[] = [
+  {
+    version: '1.2.0',
+    fecha: FECHA_VERSION,
+    titulo: 'Las deudas, a la vista y se pueden cambiar',
+    cambios: [
+      {
+        tipo: 'mejorado',
+        texto:
+          'Las deudas están ahora en la propia pantalla de Patrimonio, con su botón de editar en cada una, en lugar de escondidas detrás de un botón. Se cambian cuando amortizas, y el patrimonio neto se recalcula al momento.',
+      },
+      {
+        tipo: 'nuevo',
+        texto:
+          'Si el saldo de una deuda tiene más de mes y medio, aparece marcado como «saldo antiguo». Las hipotecas bajan todos los meses y los préstamos se amortizan: un saldo viejo da un patrimonio equivocado, y la app prefiere avisar antes que dar el número por bueno.',
+      },
+      {
+        tipo: 'mejorado',
+        texto:
+          'El aviso de deudas dice cuántas tienes y te dice dónde están. Y si no has apuntado ninguna, el botón abre directamente el formulario para añadirlas.',
+      },
+    ],
+  },
   {
     version: '1.1.0',
     fecha: FECHA_VERSION,

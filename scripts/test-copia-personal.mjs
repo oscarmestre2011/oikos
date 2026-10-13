@@ -134,7 +134,7 @@ async function main() {
       `Aparecen tus cuentas (por ejemplo «${primeraCuenta}»)`,
     )
 
-    await pagina.getByRole('button', { name: 'Revisar las deudas' }).click()
+    // Las deudas se ven directamente en Patrimonio: no hay que entrar en ninguna pantalla.
     await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })
     const primeraDeuda = copia.deudas[0]?.nombre ?? ''
     comprueba.comprueba(
@@ -143,7 +143,13 @@ async function main() {
     )
     await pagina.evaluate(() => window.scrollTo(0, 0))
     await pagina.waitForTimeout(200)
-    await pagina.screenshot({ path: join(CAPTURAS, 'copia-personal-importada.png') })
+    // Se recorta a los primeros 1500 px en vez de hacer la pantalla entera: el patrimonio tiene 36
+    // fotos y una captura completa pasa de 8000 px, que ni se puede abrir cómodamente. En ese trozo
+    // se ve lo que importa: el neto y, justo debajo, las deudas con su botón de editar.
+    await pagina.screenshot({
+      path: join(CAPTURAS, 'copia-personal-importada.png'),
+      clip: { x: 0, y: 0, width: 412, height: 1500 },
+    })
 
     // --- 4. Los movimientos también -----------------------------------
     // Se entra por Inicio → «Ver todos» y NO por El mes: aquel botón abre los movimientos
