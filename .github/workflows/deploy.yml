@@ -55,13 +55,12 @@ jobs:
       - name: Todas las comprobaciones
         run: npm run verify:all
 
-      # `enablement: true` activa GitHub Pages SOLO si todavia no lo esta. Con esto no hace falta
-      # entrar en Settings → Pages y elegir "GitHub Actions" a mano: el propio flujo lo deja
-      # listo la primera vez. Se añadio al comprobar que el unico paso que quedaba en manos de
-      # una persona era un clic en una pantalla de ajustes, y eso es justo lo que hay que quitar.
+      # OJO: aqui NO se pone `enablement: true`, aunque parezca comodo. La documentacion de la
+      # propia accion avisa de que esa opcion "requires a token other than GITHUB_TOKEN", y este
+      # flujo usa GITHUB_TOKEN: lo mas probable es que fallara el paso y no se publicara nada.
+      # Activar Pages es un clic en Settings -> Pages -> Source: "GitHub Actions", y se hace una
+      # sola vez. Mejor un paso manual conocido que un automatismo que falla a la primera.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
