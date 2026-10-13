@@ -44,8 +44,19 @@ export function Patrimonio({ hoy, onError }: Props) {
   const ultimos = useMemo(() => ultimosValores(fotos), [fotos])
 
   const cuentasActivas = cuentas.filter((c) => c.activa)
-  const liquidez = cuentasActivas.filter((c) => c.bloque === 'liquidez')
-  const activos = cuentasActivas.filter((c) => c.bloque === 'activo')
+  /**
+   * Las cuentas que salen en la lista: las activas y, además, las desactivadas que TODAVÍA tienen
+   * valor en la última foto.
+   *
+   * Esas siguen contando en el total bruto (el total de cada mes se calcula con todas las cuentas,
+   * para no reescribir el pasado), así que si no se listaran, las cuentas de la lista no sumarían
+   * el total... que es exactamente lo que parece un error de la app.
+   */
+  const cuentasEnLaLista = cuentas.filter(
+    (c) => c.activa || (fotoActual ? valorEn(fotoActual, c.nombre) !== undefined : false),
+  )
+  const liquidez = cuentasEnLaLista.filter((c) => c.bloque === 'liquidez')
+  const activos = cuentasEnLaLista.filter((c) => c.bloque === 'activo')
 
   const bitcoinTotal = useMemo(() => {
     const cantidad = comprasBitcoin.reduce((t, c) => t + c.cantidadBtc, 0)
@@ -306,6 +317,11 @@ export function Patrimonio({ hoy, onError }: Props) {
                       <span className="etiqueta">saldo antiguo</span>
                     </span>
                   )}
+                  {!deuda.activa && (
+                    <span className="fila__detalle">
+                      <span className="etiqueta">pagada</span>
+                    </span>
+                  )}
                 </span>
                 <span className="fila__importe fila__importe--gasto">{formateaImporte(deuda.saldo)}</span>
               </div>
@@ -325,12 +341,32 @@ export function Patrimonio({ hoy, onError }: Props) {
                   type="button"
                   className="boton boton--pequeno"
                   onClick={async () => {
+                    setConfirmarBorrado(null)
                     await guardaDeuda({ ...deuda, activa: !deuda.activa })
                   }}
                 >
                   {deuda.activa ? 'Marcar como pagada' : 'Volver a activar'}
                 </button>
-                {!deuda.activa && <span className="etiqueta">inactiva</span>}
+                {/*
+                  Borrar está aquí, en la lista, y no solo dentro del formulario de edición. Estaba
+                  únicamente allí (había que pulsar Editar y bajar por el formulario), y eso no se
+                  encuentra: si se puede añadir una deuda desde la lista, se tiene que poder quitar
+                  desde la lista. Pide confirmación en el segundo toque, porque borrar no se deshace.
+                */}
+                <button
+                  type="button"
+                  className="boton boton--pequeno boton--peligro"
+                  onClick={async () => {
+                    if (confirmarBorrado !== deuda.id) {
+                      setConfirmarBorrado(deuda.id ?? null)
+                      return
+                    }
+                    if (deuda.id) await borraDeuda(deuda.id)
+                    setConfirmarBorrado(null)
+                  }}
+                >
+                  {confirmarBorrado === deuda.id ? 'Confirmar borrado' : 'Borrar'}
+                </button>
               </div>
             </Tarjeta>
           ),
@@ -484,6 +520,7 @@ export function Patrimonio({ hoy, onError }: Props) {
                     <span className="fila__titulo">{cuenta.nombre}</span>
                     <span className="fila__detalle">
                       {valor === undefined ? 'sin valor en la última foto' : `el ${formateaFechaCorta(fotoActual!.fecha)}`}
+                      {!cuenta.activa ? ' · desactivada, pero cuenta en el total de esos meses' : ''}
                     </span>
                   </span>
                   <span className="fila__importe">{valor === undefined ? '—' : formateaImporte(valor)}</span>

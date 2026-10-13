@@ -25,7 +25,7 @@ import { formateaFecha, hoyISO, mesDe, nombreMes } from '../lib/fechas'
 import { markdownDelMes, markdownDelPatrimonio } from '../lib/markdown'
 import { calculaPresupuestos, resumenMes } from '../lib/resumen'
 import type { PropsPantalla } from '../navegacion'
-import type { Categoria, Cuenta, TipoMovimiento } from '../types'
+import type { Categoria, Cuenta, FotoPatrimonio, TipoMovimiento } from '../types'
 import { FECHA_VERSION, ULTIMA_NOTA, VERSION } from '../version'
 
 interface Props extends PropsPantalla {
@@ -284,7 +284,12 @@ export function Ajustes({ nav, hoy, onError }: Props) {
               {cuentas
                 .filter((c) => c.bloque === bloque)
                 .map((cuenta) => (
-                  <FilaCuenta key={cuenta.id ?? cuenta.nombre} cuenta={cuenta} onError={onError} />
+                  <FilaCuenta
+                    key={cuenta.id ?? cuenta.nombre}
+                    cuenta={cuenta}
+                    fotos={fotos}
+                    onError={onError}
+                  />
                 ))}
             </div>
           ))}
@@ -585,8 +590,29 @@ function NuevaCategoria({ onError }: { onError: (mensaje: string) => void }) {
   )
 }
 
-function FilaCuenta({ cuenta, onError }: { cuenta: Cuenta; onError: (mensaje: string) => void }) {
+function FilaCuenta({
+  cuenta,
+  fotos,
+  onError,
+}: {
+  cuenta: Cuenta
+  fotos: FotoPatrimonio[]
+  onError: (mensaje: string) => void
+}) {
   const [nombre, setNombre] = useState(cuenta.nombre)
+  const [confirmar, setConfirmar] = useState(false)
+  /**
+   * En cuántas fotos del patrimonio aparece esta cuenta.
+   *
+   * Es la diferencia entre desactivar y borrar, y no es un detalle: los valores de cada foto se
+   * guardan por el NOMBRE de la cuenta, y el total de un mes se calcula con las cuentas que
+   * existen. Si se borra una cuenta, sus valores dejan de sumar en TODOS los meses anteriores y el
+   * patrimonio del pasado cambia sin que nadie lo haya tocado.
+   *
+   * Desactivar hace justo lo que se espera: deja de pedirte esa cuenta cada mes, pero la historia
+   * se queda como estaba.
+   */
+  const usos = fotos.filter((foto) => foto.valores.some((v) => v.cuenta === cuenta.nombre)).length
 
   return (
     <div className="fila" style={{ paddingLeft: 0, paddingRight: 0 }}>
@@ -623,11 +649,23 @@ function FilaCuenta({ cuenta, onError }: { cuenta: Cuenta; onError: (mensaje: st
         type="button"
         className="boton boton--pequeno boton--peligro"
         onClick={async () => {
-          if (cuenta.id) await borraCuenta(cuenta.id)
+          if (!cuenta.id) return
+          if (!confirmar) {
+            setConfirmar(true)
+            return
+          }
+          if (usos > 0) {
+            onError(
+              `"${cuenta.nombre}" tiene valores en ${usos} ${usos === 1 ? 'foto' : 'fotos'} del patrimonio. Desactívala (el botón del ojo) en lugar de borrarla: si la borras, cambia el patrimonio de esos meses.`,
+            )
+            setConfirmar(false)
+            return
+          }
+          await borraCuenta(cuenta.id)
         }}
         aria-label={`Borrar ${cuenta.nombre}`}
       >
-        ×
+        {confirmar ? '¿?' : '×'}
       </button>
     </div>
   )

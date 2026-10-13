@@ -328,9 +328,27 @@ async function main() {
     comprueba.comprueba(textoAjustes.includes('solo en este móvil'), 'Ajustes avisa de dónde viven los datos')
     await captura('06-ajustes')
 
+    // --- Y no deja borrar una cuenta con historia ----------------------
+    // Los valores de cada foto se guardan por el NOMBRE de la cuenta, y el total de un mes se
+    // calcula con las cuentas que existen: borrar una cuenta haría cambiar el patrimonio de TODOS
+    // los meses en los que aparece, sin que nadie lo haya tocado. La app lo impide y manda
+    // desactivarla, que deja de pedirla cada mes pero conserva la historia.
+    await pagina.getByText(/Cuentas del patrimonio/).click()
+    const borrarCorriente = pagina.getByRole('button', { name: 'Borrar Cuenta corriente' })
+    await borrarCorriente.click()
+    await borrarCorriente.click()
+    comprueba.comprueba(
+      await aparece('Desactívala'),
+      'No deja borrar una cuenta con valores en el patrimonio: avisa y manda desactivarla',
+    )
+
     // --- 8. Los datos siguen ahí al recargar ---------------------------
     await pagina.reload({ waitUntil: 'domcontentloaded' })
     await pagina.getByText('Gastado este mes').waitFor({ timeout: 15_000 })
+    // Se ESPERA a que el concepto salga en pantalla antes de leer el texto. La lista de movimientos
+    // se rellena con una consulta a la base de datos, y leer nada más recargar daba un falso fallo
+    // que aparecía una vez sí y otra no: el mismo tipo de carrera que ya ha mordido varias veces.
+    await aparece(GASTO_CONCEPTO, 10_000)
     const trasRecargar = await pagina.locator('body').innerText()
     comprueba.comprueba(trasRecargar.includes(GASTO_CONCEPTO), 'El movimiento sobrevive a recargar la página')
     comprueba.comprueba(

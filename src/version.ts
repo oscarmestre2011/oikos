@@ -8,7 +8,7 @@
  * tienen la app instalada seguirian con la copia vieja en caché.
  */
 
-export const VERSION = '1.2.1'
+export const VERSION = '1.2.2'
 
 export const FECHA_VERSION = '2026-10-13'
 
@@ -25,6 +25,28 @@ export interface Nota {
 }
 
 export const NOVEDADES: Nota[] = [
+  {
+    version: '1.2.2',
+    fecha: FECHA_VERSION,
+    titulo: 'Borrar, donde se añade',
+    cambios: [
+      {
+        tipo: 'mejorado',
+        texto:
+          'Cada deuda tiene su botón Borrar en la lista, al lado de Editar, en lugar de estar solo dentro del formulario de edición. Pide confirmación en el segundo toque, porque borrar no se deshace.',
+      },
+      {
+        tipo: 'arreglado',
+        texto:
+          'Ya no se puede borrar por error una cuenta que tenga valores en el patrimonio: la app avisa y manda desactivarla. Los valores de cada foto se guardan por el nombre de la cuenta, así que borrarla cambiaba el patrimonio de todos esos meses sin que nadie lo hubiera tocado.',
+      },
+      {
+        tipo: 'arreglado',
+        texto:
+          'Una cuenta desactivada que todavía tiene valor en la última foto ya aparece en la lista de Mis cuentas, marcada como desactivada. Contaba en el total pero no se listaba, así que las cuentas parecían no sumar el total.',
+      },
+    ],
+  },
   {
     version: '1.2.1',
     fecha: FECHA_VERSION,

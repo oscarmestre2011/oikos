@@ -564,13 +564,19 @@ async function main() {
       'Una deuda nueva entra en el total',
     )
 
+    // Se borra desde la LISTA, que es donde está el botón de añadir: si se puede añadir una deuda
+    // ahí, se tiene que poder quitar ahí. Antes solo se podía desde dentro del formulario de
+    // edición, y eso no se encuentra (duda real de Óscar).
     const tarjetaTemporal = pagina.locator('.tarjeta').filter({ hasText: DEUDA_TEMPORAL })
-    await tarjetaTemporal.getByRole('button', { name: 'Editar' }).click()
-    await pagina.getByRole('button', { name: 'Borrar', exact: true }).click()
-    await pagina.getByRole('button', { name: 'Confirmar borrado' }).click()
+    await tarjetaTemporal.getByRole('button', { name: 'Borrar', exact: true }).click()
+    comprueba.comprueba(
+      (await aparece('Confirmar borrado')) && (await pagina.getByText(DEUDA_TEMPORAL).count()) > 0,
+      'Borrar una deuda desde la lista pide confirmación y todavía no la borra',
+    )
+    await tarjetaTemporal.getByRole('button', { name: 'Confirmar borrado' }).click()
     comprueba.comprueba(
       await desaparece(DEUDA_TEMPORAL),
-      'Borrar una deuda pide confirmación y la quita',
+      'Y el segundo toque la borra de verdad',
     )
 
     comprueba.comprueba(
