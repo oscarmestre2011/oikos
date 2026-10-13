@@ -8,7 +8,7 @@
     "dev": "vite",
     "dev:lan": "vite --host",
     "build": "vite build",
-    "build:pages": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-pages.ps1",
+    "build:pages": "node scripts/build-pages.mjs",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "copia:personal": "vite-node scripts/generar-copia-personal.ts",
