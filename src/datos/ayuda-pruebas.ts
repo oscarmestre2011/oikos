@@ -17,7 +17,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import type { Ajuste, Categoria, CompraBitcoin, Cuenta, Deuda, FotoPatrimonio, Movimiento, Presupuesto } from '../types'
 
 /** Copia de seguridad completa, con el mismo formato que exporta la app. */
@@ -35,9 +35,18 @@ export interface CopiaPersonal {
   bitcoin: CompraBitcoin[]
 }
 
-export const RUTA_COPIA_PERSONAL = fileURLToPath(
-  new URL('../../../datos/oikos-mi-historial.json', import.meta.url),
-)
+/**
+ * Ruta al archivo de datos personales, construida desde el directorio de trabajo.
+ *
+ * OJO, y esto costo una publicacion fallida: NO se usa `import.meta.url` + `fileURLToPath`.
+ * Con eso la prueba pasaba en Windows pero **reventaba en GitHub Actions** con «The URL must be of
+ * scheme file», porque alli el modulo se carga con una direccion `http://localhost/...` (entorno
+ * jsdom) y `fileURLToPath` solo acepta direcciones `file:`. Es un fallo invisible en local.
+ *
+ * Las pruebas se ejecutan siempre desde la carpeta del proyecto, asi que la ruta relativa vale en
+ * Windows y en Linux, sin depender de como se cargue el modulo.
+ */
+export const RUTA_COPIA_PERSONAL = resolve(process.cwd(), '..', 'datos', 'oikos-mi-historial.json')
 
 /** ¿Está la copia personal en este equipo? Si no, las pruebas que la necesitan se saltan. */
 export const hayCopiaPersonal = existsSync(RUTA_COPIA_PERSONAL)
