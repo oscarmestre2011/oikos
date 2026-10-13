@@ -303,6 +303,18 @@ async function main() {
     await pagina.getByRole('button', { name: 'Guardar la foto' }).click()
     await pagina.getByText('Fotos guardadas').waitFor({ timeout: 10_000 })
 
+    // --- Borrar una foto pide confirmación -----------------------------
+    // Es lo más destructivo de la app (una foto es un mes entero de historia) y se hacía de un solo
+    // toque en una «×» pequeña, al lado de la fila que estuvieras mirando.
+    const tarjetaFotos = pagina.locator('.tarjeta').filter({ hasText: 'Fotos guardadas' })
+    const botonBorrarFoto = pagina.getByRole('button', { name: /^Borrar la foto del/ }).first()
+    await botonBorrarFoto.click()
+    const textoFotos = await tarjetaFotos.innerText()
+    comprueba.comprueba(
+      textoFotos.includes('1 fotos') && textoFotos.includes('¿?'),
+      'Borrar la foto del patrimonio pide confirmación: el primer toque no borra nada',
+    )
+
     // Y se apunta su propia deuda (el nombre es inventado: no es la de nadie). La tarjeta de las
     // deudas sale ya en esta misma pantalla, así que no hay que entrar en ningún sitio.
     await pagina.getByText('Deuda propia').waitFor({ timeout: 10_000 })

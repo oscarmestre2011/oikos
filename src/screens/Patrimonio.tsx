@@ -29,6 +29,8 @@ export function Patrimonio({ hoy, onError }: Props) {
   const [borrador, setBorrador] = useState<Record<string, string>>({})
   const [deudaEnEdicion, setDeudaEnEdicion] = useState<Deuda | 'nueva' | null>(null)
   const [confirmarBorrado, setConfirmarBorrado] = useState<number | null>(null)
+  /** La foto del patrimonio cuya «×» se ha pulsado una vez, esperando la confirmación. */
+  const [fotoPorBorrar, setFotoPorBorrar] = useState<number | null>(null)
 
   const fotoActual = useMemo(() => ultimaFoto(fotos), [fotos])
   const serie = useMemo(() => seriePatrimonio(fotos, cuentas), [fotos, cuentas])
@@ -119,9 +121,21 @@ export function Patrimonio({ hoy, onError }: Props) {
     }
   }
 
+  /**
+   * Borrar una foto del patrimonio pide confirmación en el segundo toque.
+   *
+   * Es la operación más destructiva de la app: una foto es un mes entero de historia, y volver a
+   * teclearla desde cero es un rato largo. Se hacía de un solo toque en una «×» pequeña, al lado de
+   * la fila que estabas mirando. Ahora se confirma, como el resto de cosas que no se deshacen.
+   */
   const borrarFotoDelDia = async (id: number) => {
+    if (fotoPorBorrar !== id) {
+      setFotoPorBorrar(id)
+      return
+    }
     try {
       await borraFoto(id)
+      setFotoPorBorrar(null)
     } catch (error) {
       onError(`No se pudo borrar: ${(error as Error).message}`)
     }
@@ -606,7 +620,7 @@ export function Patrimonio({ hoy, onError }: Props) {
                     onClick={() => borrarFotoDelDia(foto.id!)}
                     aria-label={`Borrar la foto del ${foto.fecha}`}
                   >
-                    ×
+                    {fotoPorBorrar === foto.id ? '¿?' : '×'}
                   </button>
                 )}
               </div>

@@ -8,7 +8,7 @@
  * tienen la app instalada seguirian con la copia vieja en caché.
  */
 
-export const VERSION = '1.2.2'
+export const VERSION = '1.2.3'
 
 export const FECHA_VERSION = '2026-10-13'
 
@@ -25,6 +25,18 @@ export interface Nota {
 }
 
 export const NOVEDADES: Nota[] = [
+  {
+    version: '1.2.3',
+    fecha: FECHA_VERSION,
+    titulo: 'Un mes de historia no se borra de un toque',
+    cambios: [
+      {
+        tipo: 'arreglado',
+        texto:
+          'Borrar la foto del patrimonio pide confirmación. Era la operación más destructiva de la app y se hacía de un solo toque en una «×» pequeña, al lado de la fila que estuvieras mirando: una foto es un mes entero de historia, y volver a teclearla es un rato largo.',
+      },
+    ],
+  },
   {
     version: '1.2.2',
     fecha: FECHA_VERSION,
